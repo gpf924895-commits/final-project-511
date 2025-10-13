@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import '../widgets/app_drawer.dart';
 
 class NotificationsPage extends StatelessWidget {
-  const NotificationsPage({super.key});
+  final Function(bool)? toggleTheme;
+  
+  const NotificationsPage({super.key, this.toggleTheme});
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +16,20 @@ class NotificationsPage extends StatelessWidget {
         title: const Text('الإشعارات'),
         centerTitle: true,
         backgroundColor: Colors.green,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: toggleTheme != null ? [
+          Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          ),
+        ] : null,
       ),
+      drawer: toggleTheme != null ? AppDrawer(toggleTheme: toggleTheme!) : null,
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [

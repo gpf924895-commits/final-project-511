@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:new_project/database/app_database.dart';
+import 'package:provider/provider.dart';
+import 'package:new_project/provider/pro_login.dart';
 
-import 'home_page.dart';
 import 'signup_page.dart';
 import 'admin_login_page.dart';
+import 'home_page.dart';
+import '../utils/page_transition.dart';
 
 class LoginPage extends StatefulWidget {
   final Function(bool) toggleTheme;
@@ -18,54 +20,47 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
-  bool _isLoading = false;
   bool _obscure = true;
 
-  final DatabaseHelper _databaseHelper = DatabaseHelper();
+  @override
+  void initState() {
+    super.initState();
+    // Clear any previous error messages when the login page is loaded
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      authProvider.clearError();
+    });
+  }
 
   void _login() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    setState(() => _isLoading = true);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    final success = await authProvider.loginUser(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
 
-    try {
-      final result = await _databaseHelper.loginUser(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم تسجيل الدخول بنجاح'),
+          backgroundColor: Colors.green,
+        ),
       );
-
-      setState(() => _isLoading = false);
-
-      if (result['success']) {
-        // حفظ بيانات المستخدم للجلسة (يمكنك استخدام SharedPreferences)
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message']),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => HomePage(toggleTheme: widget.toggleTheme),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message']),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() => _isLoading = false);
+      
+      // Navigate to HomePage and remove all previous routes
+      SmoothPageTransition.navigateAndRemoveUntil(
+        context,
+        HomePage(toggleTheme: widget.toggleTheme),
+      );
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('حدث خطأ غير متوقع: $e'),
+          content: Text(authProvider.errorMessage ?? 'حدث خطأ في تسجيل الدخول'),
           backgroundColor: Colors.red,
         ),
       );
@@ -91,9 +86,9 @@ class _LoginPageState extends State<LoginPage> {
             const Text('تسجيل دخول'),
             TextButton(
               onPressed: () {
-                Navigator.push(
+                SmoothPageTransition.navigateTo(
                   context,
-                  MaterialPageRoute(builder: (_) => const AdminLoginPage()),
+                  const AdminLoginPage(),
                 );
               },
               child: const Text(
@@ -176,9 +171,11 @@ class _LoginPageState extends State<LoginPage> {
                 },
               ),
               const SizedBox(height: 24),
-              _isLoading
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton(
+              Consumer<AuthProvider>(
+                builder: (context, authProvider, child) {
+                  return authProvider.isLoading
+                      ? const CircularProgressIndicator()
+                      : ElevatedButton(
                       onPressed: _login,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
@@ -195,28 +192,31 @@ class _LoginPageState extends State<LoginPage> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ),
+                    );
+                },
+              ),
               const SizedBox(height: 16),
-              TextButton(
-                onPressed: _isLoading
-                    ? null
-                    : () {
-                        Navigator.push(
+              Consumer<AuthProvider>(
+                builder: (context, authProvider, child) {
+                  return TextButton(
+                    onPressed: authProvider.isLoading
+                        ? null
+                        : () {
+                        SmoothPageTransition.navigateTo(
                           context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                SignupPage(toggleTheme: widget.toggleTheme),
-                          ),
+                          SignupPage(toggleTheme: widget.toggleTheme),
                         );
                       },
-                child: const Text(
-                  'إنشاء حساب جديد',
-                  style: TextStyle(
-                    color: Colors.green,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                    child: const Text(
+                      'إنشاء حساب جديد',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'admin_panel_page.dart'; // تأكد أنك أنشأت هذه الصفحة
+import 'package:provider/provider.dart';
+import 'package:new_project/provider/pro_login.dart';
+import 'package:new_project/screens/Admin_home_page.dart';
+import '../utils/page_transition.dart';
 
 class AdminLoginPage extends StatefulWidget {
   const AdminLoginPage({super.key});
@@ -9,16 +12,68 @@ class AdminLoginPage extends StatefulWidget {
 }
 
 class _AdminLoginPageState extends State<AdminLoginPage> {
-  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _obscure = true;
 
-  void _login() {
-    // مباشرة يفتح لوحة التحكم
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const AdminPanelPage()),
+  @override
+  void initState() {
+    super.initState();
+    // Clear any previous error messages when the admin login page is loaded
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      authProvider.clearError();
+    });
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _login() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    final success = await authProvider.loginAdmin(
+      username: _usernameController.text.trim(),
+      password: _passwordController.text,
     );
+
+    if (success && mounted) {
+      // Check if currentUser is not null before navigating
+      if (authProvider.currentUser != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم تسجيل دخول المشرف بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Navigate to Admin Panel Page with admin data and remove all previous routes
+        SmoothPageTransition.navigateAndRemoveUntil(
+          context,
+          AdminPanelPage(
+            admin: authProvider.currentUser!,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('حدث خطأ في تسجيل الدخول'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.errorMessage ?? 'بيانات المشرف غير صحيحة'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -26,6 +81,12 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFE4E5D3),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
         title: const Text('دخول المشرف'),
         backgroundColor: Colors.green,
         centerTitle: true,
@@ -43,8 +104,8 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
             ),
             const SizedBox(height: 24),
             TextField(
-              controller: _emailController,
-              decoration: const InputDecoration(labelText: 'الإيميل', border: OutlineInputBorder()),
+              controller: _usernameController,
+              decoration: const InputDecoration(labelText: 'اسم المستخدم', border: OutlineInputBorder()),
               textAlign: TextAlign.right,
             ),
             const SizedBox(height: 16),
@@ -62,14 +123,20 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
               textAlign: TextAlign.right,
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _login,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-              ),
-              child: const Text('دخول'),
+            Consumer<AuthProvider>(
+              builder: (context, authProvider, child) {
+                return authProvider.isLoading
+                    ? const CircularProgressIndicator()
+                    : ElevatedButton(
+                        onPressed: _login,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          minimumSize: const Size(double.infinity, 48),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                        ),
+                        child: const Text('دخول'),
+                      );
+              },
             ),
           ],
         ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'add_lecture_page.dart';
 import 'edit_lecture_page.dart';
 import 'delete_lecture_page.dart';
+import '../utils/page_transition.dart';
 
 class SelectSectionPage extends StatelessWidget {
   final String action;
@@ -32,25 +33,19 @@ class SelectSectionPage extends StatelessWidget {
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () {
                 if (action == 'add') {
-                  Navigator.push(
+                  SmoothPageTransition.navigateTo(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => AddLecturePage(section: sections[index]),
-                    ),
+                    AddLecturePage(section: sections[index]),
                   );
                 } else if (action == 'edit') {
-                  Navigator.push(
+                  SmoothPageTransition.navigateTo(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => EditLecturePage(section: sections[index]),
-                    ),
+                    EditLecturePage(section: sections[index]),
                   );
                 } else if (action == 'delete') {
-                  Navigator.push(
+                  SmoothPageTransition.navigateTo(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => DeleteLecturePage(section: sections[index]),
-                    ),
+                    DeleteLecturePage(section: sections[index]),
                   );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(

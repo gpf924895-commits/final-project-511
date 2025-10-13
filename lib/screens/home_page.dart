@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/provider/lecture_provider.dart';
+import 'package:new_project/provider/prayer_times_provider.dart';
+import 'package:new_project/provider/location_provider.dart';
 import 'fiqh_section.dart';
 import 'hadith_section.dart';
 import 'tafsir_section.dart';
 import 'seerah_section.dart';
 import 'notifications_page.dart';
 import 'settings_page.dart';
+import '../widgets/mosque_map_preview.dart';
+import '../widgets/app_drawer.dart';
+import '../utils/page_transition.dart';
 
 class HomePage extends StatefulWidget {
   final Function(bool) toggleTheme;
@@ -16,11 +24,41 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   @override
+  void initState() {
+    super.initState();
+    // Load all lectures when home page opens
+    Future.microtask(() {
+      Provider.of<LectureProvider>(context, listen: false).loadAllSections();
+      // Load location and calculate prayer times
+      _loadPrayerTimes();
+    });
+  }
+
+  Future<void> _loadPrayerTimes() async {
+    final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+    final prayerTimesProvider = Provider.of<PrayerTimesProvider>(context, listen: false);
+    
+    // Get current location
+    await locationProvider.getCurrentLocation();
+    
+    // Calculate prayer times based on location
+    if (locationProvider.currentPosition != null) {
+      await prayerTimesProvider.calculatePrayerTimes(locationProvider.currentPosition);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: Colors.green,
+        title: const Text('الرئيسية'),
+        centerTitle: true,
+      ),
+      drawer: AppDrawer(toggleTheme: widget.toggleTheme),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -69,6 +107,12 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(height: 24),
+              // أوقات الصلاة
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: _buildPrayerTimesSection(),
+              ),
+              const SizedBox(height: 24),
               // خريطة المسجد النبوي
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -83,15 +127,7 @@ class _HomePageState extends State<HomePage> {
                           color: Colors.green),
                     ),
                     const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.asset(
-                        'assets/map.png',
-                        height: 150,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
+                    MosqueMapPreview(toggleTheme: widget.toggleTheme),
                   ],
                 ),
               ),
@@ -99,28 +135,114 @@ class _HomePageState extends State<HomePage> {
               // المضافة مؤخرًا
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'المضافة مؤخرًا',
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green),
-                    ),
-                    const SizedBox(height: 8),
-                    Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const ListTile(
-                        leading: Icon(Icons.menu_book_outlined),
-                        title: Text('المحاضرة الأولى'),
-                        subtitle: Text('وصف المحاضرة...'),
-                      ),
-                    ),
-                  ],
+                child: Consumer<LectureProvider>(
+                  builder: (context, lectureProvider, child) {
+                    final recentLectures = lectureProvider.recentLectures;
+                    
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'المضافة مؤخرًا',
+                              style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green),
+                            ),
+                            if (recentLectures.isNotEmpty)
+                              TextButton(
+                                onPressed: () {
+                                  lectureProvider.loadAllSections();
+                                },
+                                child: const Icon(Icons.refresh, size: 20, color: Colors.green),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        if (recentLectures.isEmpty)
+                          Card(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Center(
+                                child: Column(
+                                  children: [
+                                    Icon(Icons.library_books, size: 48, color: Colors.grey[400]),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'لا توجد محاضرات بعد',
+                                      style: TextStyle(color: Colors.grey[600]),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          ...recentLectures.map((lecture) {
+                            IconData sectionIcon = Icons.menu_book_outlined;
+                            switch (lecture['section']) {
+                              case 'الفقه':
+                                sectionIcon = Icons.library_books;
+                                break;
+                              case 'الحديث':
+                                sectionIcon = Icons.auto_stories;
+                                break;
+                              case 'التفسير':
+                                sectionIcon = Icons.menu_book;
+                                break;
+                              case 'السيرة':
+                                sectionIcon = Icons.book;
+                                break;
+                            }
+                            
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: Colors.green,
+                                  child: Icon(sectionIcon, color: Colors.white),
+                                ),
+                                title: Text(lecture['title']),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      lecture['description'],
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'القسم: ${lecture['section']}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.green,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                trailing: lecture['video_path'] != null
+                                    ? const Icon(Icons.video_library, color: Colors.green)
+                                    : null,
+                                onTap: () {
+                                  _showLectureDetails(context, lecture);
+                                },
+                              ),
+                            );
+                          }).toList(),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -140,16 +262,378 @@ class _HomePageState extends State<HomePage> {
         currentIndex: 1,
         onTap: (index) {
           if (index == 0) {
-            Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const NotificationsPage()));
-          } else if (index == 2) {
-            Navigator.push(
+            SmoothPageTransition.navigateTo(
                 context,
-                MaterialPageRoute(
-                    builder: (_) =>
-                        SettingsPage(toggleTheme: widget.toggleTheme)));
+                NotificationsPage(toggleTheme: widget.toggleTheme));
+          } else if (index == 2) {
+            SmoothPageTransition.navigateTo(
+                context,
+                SettingsPage(toggleTheme: widget.toggleTheme));
           }
         },
+      ),
+    );
+  }
+
+  Widget _buildPrayerTimesSection() {
+    return Consumer2<PrayerTimesProvider, LocationProvider>(
+      builder: (context, prayerTimesProvider, locationProvider, child) {
+        if (prayerTimesProvider.isLoading || locationProvider.isLoading) {
+          return Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Padding(
+              padding: EdgeInsets.all(24.0),
+              child: Center(
+                child: CircularProgressIndicator(color: Colors.green),
+              ),
+            ),
+          );
+        }
+
+        if (prayerTimesProvider.errorMessage != null || locationProvider.errorMessage != null) {
+          return Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.orange, size: 40),
+                  const SizedBox(height: 8),
+                  Text(
+                    prayerTimesProvider.errorMessage ?? locationProvider.errorMessage ?? 'خطأ في تحميل أوقات الصلاة',
+                    style: const TextStyle(color: Colors.orange),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: _loadPrayerTimes,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('إعادة المحاولة'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (prayerTimesProvider.prayerTimes == null) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'أوقات الصلاة',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.green, size: 20),
+                  onPressed: _loadPrayerTimes,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Next prayer indicator
+            if (prayerTimesProvider.nextPrayer.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.green.shade400, Colors.green.shade600],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.notifications_active,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'الصلاة القادمة',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${prayerTimesProvider.getArabicPrayerName(prayerTimesProvider.nextPrayer)} ${prayerTimesProvider.getFormattedPrayerTime(prayerTimesProvider.nextPrayer)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            prayerTimesProvider.getTimeUntilNextPrayer(),
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // Prayer times grid
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildPrayerTimeItem(
+                            'fajr',
+                            Icons.wb_twilight,
+                            prayerTimesProvider,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildPrayerTimeItem(
+                            'sunrise',
+                            Icons.wb_sunny,
+                            prayerTimesProvider,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildPrayerTimeItem(
+                            'dhuhr',
+                            Icons.wb_sunny_outlined,
+                            prayerTimesProvider,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildPrayerTimeItem(
+                            'asr',
+                            Icons.cloud,
+                            prayerTimesProvider,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildPrayerTimeItem(
+                            'maghrib',
+                            Icons.nightlight,
+                            prayerTimesProvider,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildPrayerTimeItem(
+                            'isha',
+                            Icons.bedtime,
+                            prayerTimesProvider,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (locationProvider.locationName.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.location_on, size: 14, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        'بتوقيت ${locationProvider.locationName}',
+                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildPrayerTimeItem(
+    String prayerKey,
+    IconData icon,
+    PrayerTimesProvider provider,
+  ) {
+    final isNext = provider.isNextPrayer(prayerKey);
+    final arabicName = provider.getArabicPrayerName(prayerKey);
+    final time = provider.getFormattedPrayerTime(prayerKey);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      decoration: BoxDecoration(
+        color: isNext ? Colors.green.withOpacity(0.1) : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        border: isNext
+            ? Border.all(color: Colors.green, width: 2)
+            : Border.all(color: Colors.transparent, width: 2),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            color: isNext ? Colors.green : Colors.grey,
+            size: 20,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            arabicName,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: isNext ? FontWeight.bold : FontWeight.normal,
+              color: isNext ? Colors.green : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            time,
+            style: TextStyle(
+              fontSize: 10,
+              color: isNext ? Colors.green : Colors.grey[600],
+              fontWeight: isNext ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(dynamic dateValue) {
+    try {
+      DateTime date;
+      if (dateValue is Timestamp) {
+        date = dateValue.toDate();
+      } else if (dateValue is String) {
+        date = DateTime.parse(dateValue);
+      } else if (dateValue is DateTime) {
+        date = dateValue;
+      } else {
+        return 'تاريخ غير صالح';
+      }
+      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return 'تاريخ غير صالح';
+    }
+  }
+
+  void _showLectureDetails(BuildContext context, Map<String, dynamic> lecture) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(lecture['title']),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'القسم: ${lecture['section']}',
+                  style: const TextStyle(
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'الوصف:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(lecture['description']),
+              const SizedBox(height: 16),
+              if (lecture['video_path'] != null) ...[
+                const Row(
+                  children: [
+                    Icon(Icons.video_library, color: Colors.green, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'يحتوي على فيديو',
+                      style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
+              Text(
+                'تاريخ الإضافة: ${_formatDate(lecture['created_at'])}',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إغلاق'),
+          ),
+        ],
       ),
     );
   }
@@ -171,34 +655,30 @@ class CategoryIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
+        // Get toggleTheme from parent
+        final homePageState = context.findAncestorStateOfType<_HomePageState>();
+        final toggleTheme = homePageState?.widget.toggleTheme;
+        
         switch (title) {
           case 'الفقه':
-            Navigator.push(
+            SmoothPageTransition.navigateTo(
                 context,
-                MaterialPageRoute(
-                    builder: (_) =>
-                        FiqhSectionPage(isDarkMode: isDarkMode)));
+                FiqhSectionPage(isDarkMode: isDarkMode, toggleTheme: toggleTheme));
             break;
           case 'الحديث':
-            Navigator.push(
+            SmoothPageTransition.navigateTo(
                 context,
-                MaterialPageRoute(
-                    builder: (_) =>
-                        HadithSectionPage(isDarkMode: isDarkMode)));
+                HadithSectionPage(isDarkMode: isDarkMode, toggleTheme: toggleTheme));
             break;
           case 'التفسير':
-            Navigator.push(
+            SmoothPageTransition.navigateTo(
                 context,
-                MaterialPageRoute(
-                    builder: (_) =>
-                        TafsirSectionPage(isDarkMode: isDarkMode)));
+                TafsirSectionPage(isDarkMode: isDarkMode, toggleTheme: toggleTheme));
             break;
           case 'السيرة':
-            Navigator.push(
+            SmoothPageTransition.navigateTo(
                 context,
-                MaterialPageRoute(
-                    builder: (_) =>
-                        SeerahSectionPage(isDarkMode: isDarkMode)));
+                SeerahSectionPage(isDarkMode: isDarkMode, toggleTheme: toggleTheme));
             break;
         }
       },

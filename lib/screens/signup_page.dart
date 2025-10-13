@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:new_project/database/app_database.dart';
-import 'home_page.dart';
+import 'package:provider/provider.dart';
+import 'package:new_project/provider/pro_login.dart';
 
 class SignupPage extends StatefulWidget {
   final Function(bool) toggleTheme;
@@ -18,11 +18,18 @@ class _SignupPageState extends State<SignupPage> {
       TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
-  bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
-  final DatabaseHelper _databaseHelper = DatabaseHelper();
+  @override
+  void initState() {
+    super.initState();
+    // Clear any previous error messages when the signup page is loaded
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      authProvider.clearError();
+    });
+  }
 
   void _register() async {
     if (!_formKey.currentState!.validate()) {
@@ -42,52 +49,41 @@ class _SignupPageState extends State<SignupPage> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    final success = await authProvider.signupUser(
+      username: _usernameController.text.trim(),
+      email: _emailController.text.trim(),
+      password: password,
+    );
 
-    try {
-      final result = await _databaseHelper.registerUser(
-        username: _usernameController.text.trim(),
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم إنشاء الحساب بنجاح'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // تسجيل دخول تلقائي بعد إنشاء الحساب
+      final loginSuccess = await authProvider.loginUser(
         email: _emailController.text.trim(),
         password: password,
       );
 
-      setState(() => _isLoading = false);
-
-      if (result['success']) {
+      if (loginSuccess) {
+        // Navigation will be handled automatically by the Consumer in main.dart
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message']),
+          const SnackBar(
+            content: Text('تم تسجيل الدخول تلقائياً'),
             backgroundColor: Colors.green,
           ),
         );
-
-        // تسجيل دخول تلقائي بعد إنشاء الحساب
-        final loginResult = await _databaseHelper.loginUser(
-          email: _emailController.text.trim(),
-          password: password,
-        );
-
-        if (loginResult['success']) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => HomePage(toggleTheme: widget.toggleTheme),
-            ),
-          );
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message']),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
-    } catch (e) {
-      setState(() => _isLoading = false);
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('حدث خطأ غير متوقع: $e'),
+          content: Text(authProvider.errorMessage ?? 'حدث خطأ في إنشاء الحساب'),
           backgroundColor: Colors.red,
         ),
       );
@@ -241,9 +237,11 @@ class _SignupPageState extends State<SignupPage> {
                 },
               ),
               const SizedBox(height: 24),
-              _isLoading
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton(
+              Consumer<AuthProvider>(
+                builder: (context, authProvider, child) {
+                  return authProvider.isLoading
+                      ? const CircularProgressIndicator()
+                      : ElevatedButton(
                       onPressed: _register,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
@@ -260,22 +258,28 @@ class _SignupPageState extends State<SignupPage> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ),
+                    );
+                },
+              ),
               const SizedBox(height: 16),
-              TextButton(
-                onPressed: _isLoading
-                    ? null
-                    : () {
+              Consumer<AuthProvider>(
+                builder: (context, authProvider, child) {
+                  return TextButton(
+                    onPressed: authProvider.isLoading
+                        ? null
+                        : () {
                         Navigator.pop(context);
                       },
-                child: const Text(
-                  'لديك حساب بالفعل؟ تسجيل دخول',
-                  style: TextStyle(
-                    color: Colors.green,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                    child: const Text(
+                      'لديك حساب بالفعل؟ تسجيل دخول',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),

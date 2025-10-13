@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:new_project/provider/pro_login.dart';
 import 'change_password_page.dart';
 import 'profile_page.dart';
 import 'login_page.dart';
+import '../widgets/app_drawer.dart';
+import '../utils/page_transition.dart';
 
 class SettingsPage extends StatefulWidget {
   final Function(bool) toggleTheme;
@@ -17,10 +21,14 @@ class _SettingsPageState extends State<SettingsPage> {
   bool isNotificationsEnabled = true;
 
   void _logout() {
-    Navigator.pushAndRemoveUntil(
+    // Call the AuthProvider logout method to clear authentication state
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    authProvider.logout();
+    
+    // Navigate to LoginPage and remove all previous routes
+    SmoothPageTransition.navigateAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => LoginPage(toggleTheme: widget.toggleTheme)),
-      (route) => false,
+      LoginPage(toggleTheme: widget.toggleTheme),
     );
   }
 
@@ -32,7 +40,20 @@ class _SettingsPageState extends State<SettingsPage> {
         backgroundColor: Colors.green,
         title: const Text('الإعدادات'),
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          ),
+        ],
       ),
+      drawer: AppDrawer(toggleTheme: widget.toggleTheme),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -41,9 +62,9 @@ class _SettingsPageState extends State<SettingsPage> {
             title: const Text('الملف الشخصي'),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
             onTap: () {
-              Navigator.push(
+              SmoothPageTransition.navigateTo(
                 context,
-                MaterialPageRoute(builder: (_) => const ProfilePage()),
+                ProfilePage(toggleTheme: widget.toggleTheme),
               );
             },
           ),
@@ -52,9 +73,9 @@ class _SettingsPageState extends State<SettingsPage> {
             title: const Text('تغيير كلمة المرور'),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
             onTap: () {
-              Navigator.push(
+              SmoothPageTransition.navigateTo(
                 context,
-                MaterialPageRoute(builder: (_) => const ChangePasswordPage()),
+                const ChangePasswordPage(),
               );
             },
           ),

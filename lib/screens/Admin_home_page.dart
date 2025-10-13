@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:new_project/database/app_database.dart';
+import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/database/firebase_service.dart';
+import 'package:new_project/screens/admin_panel_page.dart';
+import 'package:new_project/screens/admin_login_page.dart';
+import 'package:new_project/provider/pro_login.dart';
+import '../utils/page_transition.dart';
 
 class AdminPanelPage extends StatefulWidget {
   final Map<String, dynamic> admin;
@@ -11,7 +17,7 @@ class AdminPanelPage extends StatefulWidget {
 }
 
 class _AdminPanelPageState extends State<AdminPanelPage> {
-  final DatabaseHelper _databaseHelper = DatabaseHelper();
+  final FirebaseService _firebaseService = FirebaseService();
   List<Map<String, dynamic>> _users = [];
   bool _isLoading = false;
 
@@ -24,7 +30,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
   Future<void> _loadUsers() async {
     setState(() => _isLoading = true);
     try {
-      final users = await _databaseHelper.getAllUsers();
+      final users = await _firebaseService.getAllUsers();
       setState(() {
         _users = users;
         _isLoading = false;
@@ -47,21 +53,10 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
     );
   }
 
-  void _navigateToAdd(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('إضافة محاضرة'),
-        content: const Text(
-          'هذه الميزة ستكون متاحة قريباً لإضافة المحاضرات والدروس.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('حسناً'),
-          ),
-        ],
-      ),
+  void _navigateToLectureManagement(BuildContext context) {
+    SmoothPageTransition.navigateTo(
+      context,
+      const AdminLectureManagementPage(),
     );
   }
 
@@ -104,7 +99,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
     );
   }
 
-  Future<void> _deleteUser(int userId, String username) async {
+  Future<void> _deleteUser(String userId, String username) async {
     Navigator.of(context).pop(); // إغلاق الحوار الأول
 
     final confirmed = await showDialog<bool>(
@@ -127,7 +122,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
     );
 
     if (confirmed == true) {
-      final success = await _databaseHelper.deleteUser(userId);
+      final success = await _firebaseService.deleteUser(userId);
 
       if (success) {
         _showSuccessMessage('تم حذف المستخدم "$username" بنجاح');
@@ -155,8 +150,9 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
             itemCount: _users.length,
             itemBuilder: (context, index) {
               final user = _users[index];
-              final createdAt =
-                  DateTime.tryParse(user['created_at'] ?? '') ?? DateTime.now();
+              final createdAt = user['created_at'] is Timestamp
+                  ? (user['created_at'] as Timestamp).toDate()
+                  : DateTime.now();
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -216,7 +212,36 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
-              Navigator.of(context).popUntil((route) => route.isFirst);
+              // Show confirmation dialog before logout
+              showDialog(
+                context: context,
+                builder: (BuildContext dialogContext) => AlertDialog(
+                  title: const Text('تأكيد تسجيل الخروج'),
+                  content: const Text('هل أنت متأكد من تسجيل الخروج؟'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: const Text('إلغاء'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop();
+                        // Logout from AuthProvider
+                        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                        authProvider.logout();
+                        authProvider.clearError();
+                        // Navigate to admin login page and remove all previous routes
+                        SmoothPageTransition.navigateAndRemoveUntil(
+                          context,
+                          const AdminLoginPage(),
+                        );
+                      },
+                      style: TextButton.styleFrom(foregroundColor: Colors.red),
+                      child: const Text('تسجيل خروج'),
+                    ),
+                  ],
+                ),
+              );
             },
             tooltip: 'تسجيل خروج',
           ),
@@ -268,9 +293,9 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
 
                   // الأزرار الرئيسية
                   ElevatedButton.icon(
-                    onPressed: () => _navigateToAdd(context),
-                    icon: const Icon(Icons.add),
-                    label: const Text('إضافة محاضرة'),
+                    onPressed: () => _navigateToLectureManagement(context),
+                    icon: const Icon(Icons.library_books),
+                    label: const Text('إدارة المحاضرات'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,

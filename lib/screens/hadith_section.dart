@@ -1,52 +1,190 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:new_project/provider/subcategory_provider.dart';
+import 'package:new_project/screens/subcategory_lectures_page.dart';
+import '../widgets/app_drawer.dart';
 
-class HadithSectionPage extends StatelessWidget {
+class HadithSectionPage extends StatefulWidget {
   final bool isDarkMode;
-  const HadithSectionPage({super.key, required this.isDarkMode});
+  final Function(bool)? toggleTheme;
+  const HadithSectionPage({super.key, required this.isDarkMode, this.toggleTheme});
+
+  @override
+  State<HadithSectionPage> createState() => _HadithSectionPageState();
+}
+
+class _HadithSectionPageState extends State<HadithSectionPage> {
+  @override
+  void initState() {
+    super.initState();
+    // Load subcategories when page opens
+    Future.microtask(() {
+      Provider.of<SubcategoryProvider>(context, listen: false)
+          .loadSubcategoriesBySection('الحديث');
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: isDarkMode ? const Color(0xFF121212) : const Color(0xFFE4E5D3),
+      backgroundColor: widget.isDarkMode ? const Color(0xFF121212) : const Color(0xFFE4E5D3),
       appBar: AppBar(
         backgroundColor: Colors.green,
         title: const Text('قسم الحديث'),
         centerTitle: true,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: GridView.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 1,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              Provider.of<SubcategoryProvider>(context, listen: false)
+                  .loadSubcategoriesBySection('الحديث');
+            },
           ),
-          itemCount: 4, // عدد الأقسام المؤقتة
-          itemBuilder: (context, index) {
-            return OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                backgroundColor: isDarkMode ? Colors.grey[800] : Colors.white,
-                side: const BorderSide(color: Colors.green),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+          if (widget.toggleTheme != null)
+            Builder(
+              builder: (context) => IconButton(
+                icon: const Icon(Icons.menu),
+                onPressed: () => Scaffold.of(context).openDrawer(),
               ),
-              onPressed: () {
-                // زر القسم
-              },
+            ),
+        ],
+      ),
+      drawer: widget.toggleTheme != null ? AppDrawer(toggleTheme: widget.toggleTheme!) : null,
+      body: Consumer<SubcategoryProvider>(
+        builder: (context, subcategoryProvider, child) {
+          if (subcategoryProvider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final subcategories = subcategoryProvider.getSubcategoriesBySection('الحديث');
+
+          if (subcategories.isEmpty) {
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.auto_stories, size: 32),
-                  SizedBox(height: 8),
-                  Text('قسم ١'),
+                children: [
+                  Icon(Icons.category, size: 80, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'لا توجد فئات فرعية في قسم الحديث',
+                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                  ),
                 ],
               ),
             );
-          },
-        ),
+          }
+
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: ListView.builder(
+              itemCount: subcategories.length,
+              itemBuilder: (context, index) {
+                final subcategory = subcategories[index];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  color: widget.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(16),
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.green,
+                      radius: 30,
+                      child: Icon(
+                        _getIconForSubcategory(subcategory['icon_name']),
+                        color: Colors.white,
+                        size: 30,
+                      ),
+                    ),
+                    title: Text(
+                      subcategory['name'],
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    subtitle: subcategory['description'] != null
+                        ? Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              subcategory['description'],
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          )
+                        : null,
+                    trailing: const Icon(Icons.arrow_forward_ios, color: Colors.green),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SubcategoryLecturesPage(
+                            subcategoryId: subcategory['id'],
+                            subcategoryName: subcategory['name'],
+                            section: 'الحديث',
+                            isDarkMode: widget.isDarkMode,
+                            toggleTheme: widget.toggleTheme,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 1,
+        selectedItemColor: Colors.green,
+        unselectedItemColor: Colors.grey,
+        backgroundColor: widget.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'الإشعارات'),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'الإعدادات'),
+        ],
+        onTap: (index) {
+          if (index == 1) {
+            Navigator.pop(context);
+          }
+        },
       ),
     );
+  }
+
+  IconData _getIconForSubcategory(String? iconName) {
+    switch (iconName) {
+      case 'mosque':
+        return Icons.mosque;
+      case 'handshake':
+        return Icons.handshake;
+      case 'family':
+        return Icons.family_restroom;
+      case 'book':
+        return Icons.menu_book;
+      case 'books':
+        return Icons.library_books;
+      case 'list':
+        return Icons.format_list_numbered;
+      case 'quran':
+        return Icons.menu_book;
+      case 'history':
+        return Icons.history_edu;
+      case 'school':
+        return Icons.school;
+      case 'location':
+        return Icons.location_on;
+      case 'flag':
+        return Icons.flag;
+      default:
+        return Icons.category;
+    }
   }
 }
