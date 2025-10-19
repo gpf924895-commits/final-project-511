@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:new_project/provider/pro_login.dart';
+import 'package:new_project/screens/home_page.dart';
 import 'change_password_page.dart';
 import 'profile_page.dart';
-import 'login_page.dart';
 import '../widgets/app_drawer.dart';
 import '../utils/page_transition.dart';
 
@@ -21,14 +21,15 @@ class _SettingsPageState extends State<SettingsPage> {
   bool isNotificationsEnabled = true;
 
   void _logout() {
-    // Call the AuthProvider logout method to clear authentication state
+    // Call the AuthProvider logout method to return to guest mode
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     authProvider.logout();
-    
-    // Navigate to LoginPage and remove all previous routes
-    SmoothPageTransition.navigateAndRemoveUntil(
+
+    // Navigate to guest home and remove all previous routes
+    Navigator.pushAndRemoveUntil(
       context,
-      LoginPage(toggleTheme: widget.toggleTheme),
+      MaterialPageRoute(builder: (_) => HomePage(toggleTheme: (isDark) {})),
+      (route) => false,
     );
   }
 
@@ -116,7 +117,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 context: context,
                 builder: (_) => AlertDialog(
                   title: const Text('حول التطبيق'),
-                  content: const Text('تطبيق محاضرات المسجد النبوي.\nالإصدار 1.0.0\nجميع الحقوق محفوظة.'),
+                  content: const Text(
+                    'تطبيق محاضرات المسجد النبوي.\nالإصدار 1.0.0\nجميع الحقوق محفوظة.',
+                  ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
@@ -136,7 +139,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 context: context,
                 builder: (_) => AlertDialog(
                   title: const Text('المساعدة'),
-                  content: const Text('لأي استفسار يرجى التواصل على: \nexample@email.com'),
+                  content: const Text(
+                    'لأي استفسار يرجى التواصل على: \nexample@email.com',
+                  ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:new_project/provider/subcategory_provider.dart';
-import 'package:new_project/screens/subcategory_lectures_page.dart';
+import 'package:new_project/screens/subcategory_sheikhs_page.dart';
 import '../widgets/app_drawer.dart';
 
 class FiqhSectionPage extends StatefulWidget {
@@ -123,7 +123,7 @@ class _FiqhSectionPageState extends State<FiqhSectionPage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => SubcategoryLecturesPage(
+                          builder: (context) => SubcategorySheikhsPage(
                             subcategoryId: subcategory['id'],
                             subcategoryName: subcategory['name'],
                             section: 'الفقه',

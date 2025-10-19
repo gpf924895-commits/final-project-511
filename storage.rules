@@ -1,0 +1,52 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is a Sheikh
+    function isSheikh() {
+      return isAuthenticated() 
+             && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sheikh";
+    }
+    
+    // Helper function to check if content type is allowed
+    function isAllowedContentType() {
+      return request.resource.contentType.matches('audio/.*') ||
+             request.resource.contentType.matches('video/.*') ||
+             request.resource.contentType.matches('image/.*');
+    }
+    
+    // Helper function to check if file size is reasonable (max 100MB)
+    function isReasonableSize() {
+      return request.resource.size < 100 * 1024 * 1024; // 100MB
+    }
+    
+    // Lessons media files - only Sheikhs can upload to their own folder
+    match /lessons_media/{sheikhUid}/{allPaths=**} {
+      // Allow read for anyone (public access to media)
+      allow read: if true;
+      
+      // Only allow Sheikhs to upload to their own folder
+      // Enforce content type and size limits
+      allow write: if isSheikh()
+                   && request.auth.uid == sheikhUid
+                   && isAllowedContentType()
+                   && isReasonableSize();
+      
+      // Deny all other operations
+      allow delete: if false; // Prevent accidental deletion
+    }
+    
+    // Deny all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

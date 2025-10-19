@@ -35,17 +35,17 @@ class PrayerTimesProvider extends ChangeNotifier {
     try {
       // إعداد الإحداثيات
       final coordinates = Coordinates(position.latitude, position.longitude);
-      
+
       // إعداد معاملات الحساب (استخدام طريقة أم القرى المستخدمة في السعودية)
       final params = CalculationMethod.umm_al_qura.getParameters();
       params.madhab = Madhab.shafi; // المذهب الشافعي
-      
+
       // حساب أوقات الصلاة
       final prayerTimes = PrayerTimes.today(coordinates, params);
-      
+
       _prayerTimes = prayerTimes;
       _determineNextPrayer();
-      
+
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -60,18 +60,18 @@ class PrayerTimesProvider extends ChangeNotifier {
     if (_prayerTimes == null) return;
 
     final now = DateTime.now();
-    
-    if (now.isBefore(_prayerTimes!.fajr)) {
+
+    if (now.isBefore(_prayerTimes?.fajr ?? DateTime.now())) {
       _nextPrayer = 'fajr';
-    } else if (now.isBefore(_prayerTimes!.sunrise)) {
+    } else if (now.isBefore(_prayerTimes?.sunrise ?? DateTime.now())) {
       _nextPrayer = 'sunrise';
-    } else if (now.isBefore(_prayerTimes!.dhuhr)) {
+    } else if (now.isBefore(_prayerTimes?.dhuhr ?? DateTime.now())) {
       _nextPrayer = 'dhuhr';
-    } else if (now.isBefore(_prayerTimes!.asr)) {
+    } else if (now.isBefore(_prayerTimes?.asr ?? DateTime.now())) {
       _nextPrayer = 'asr';
-    } else if (now.isBefore(_prayerTimes!.maghrib)) {
+    } else if (now.isBefore(_prayerTimes?.maghrib ?? DateTime.now())) {
       _nextPrayer = 'maghrib';
-    } else if (now.isBefore(_prayerTimes!.isha)) {
+    } else if (now.isBefore(_prayerTimes?.isha ?? DateTime.now())) {
       _nextPrayer = 'isha';
     } else {
       // إذا كان الوقت بعد العشاء، الصلاة القادمة هي فجر الغد
@@ -184,4 +184,3 @@ class PrayerTimesProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
-

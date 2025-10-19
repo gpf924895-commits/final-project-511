@@ -8,12 +8,13 @@ import 'change_password_page.dart';
 import 'package:path/path.dart' as path;
 import '../widgets/app_drawer.dart';
 import '../utils/page_transition.dart';
+import '../utils/auth_guard.dart';
 import '../database/firebase_service.dart';
 import '../provider/pro_login.dart';
 
 class ProfilePage extends StatefulWidget {
   final Function(bool)? toggleTheme;
-  
+
   const ProfilePage({Key? key, this.toggleTheme}) : super(key: key);
 
   @override
@@ -33,24 +34,42 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    _initPrefsAndData();
+    _checkAuthAndInit();
+  }
+
+  Future<void> _checkAuthAndInit() async {
+    // Check authentication first
+    final isAuthenticated = await AuthGuard.requireAuth(
+      context,
+      onLoginSuccess: () {
+        // Reload data after successful login
+        _initPrefsAndData();
+      },
+    );
+
+    if (!isAuthenticated) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    await _initPrefsAndData();
   }
 
   Future<void> _initPrefsAndData() async {
     _prefs = await SharedPreferences.getInstance();
-    
+
     // Get current user ID from AuthProvider
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     _userId = authProvider.currentUser?['id'];
-    
+
     if (_userId == null) {
       setState(() => _isLoading = false);
       return;
     }
-    
+
     // Load profile data from Firebase
     await _loadProfileFromFirebase();
-    
+
     // Load saved image path from SharedPreferences
     final savedPath = _prefs.getString('profile_image_${_userId}');
     if (savedPath != null && await File(savedPath).exists()) {
@@ -58,19 +77,19 @@ class _ProfilePageState extends State<ProfilePage> {
         profileImage = File(savedPath);
       });
     }
-    
+
     setState(() => _isLoading = false);
   }
 
   Future<void> _loadProfileFromFirebase() async {
     if (_userId == null) return;
-    
+
     final userData = await _firebaseService.getUserProfile(_userId!);
     if (userData != null) {
       setState(() {
         _nameController.text = userData['name'] ?? userData['username'] ?? '';
         gender = userData['gender'] ?? 'ذكر';
-        
+
         // Parse birth date if exists
         if (userData['birth_date'] != null) {
           try {
@@ -165,16 +184,20 @@ class _ProfilePageState extends State<ProfilePage> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: widget.toggleTheme != null ? [
-          Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
-          ),
-        ] : null,
+        actions: widget.toggleTheme != null
+            ? [
+                Builder(
+                  builder: (context) => IconButton(
+                    icon: const Icon(Icons.menu),
+                    onPressed: () => Scaffold.of(context).openDrawer(),
+                  ),
+                ),
+              ]
+            : null,
       ),
-      drawer: widget.toggleTheme != null ? AppDrawer(toggleTheme: widget.toggleTheme!) : null,
+      drawer: widget.toggleTheme != null
+          ? AppDrawer(toggleTheme: widget.toggleTheme!)
+          : null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _userId == null
@@ -185,101 +208,107 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             )
           : ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          Center(
-            child: Stack(
+              padding: const EdgeInsets.all(24),
               children: [
-                CircleAvatar(
-                  radius: 55,
-                  backgroundImage: profileImage != null
-                      ? FileImage(profileImage!)
-                      : const AssetImage('assets/profile.png')
-                          as ImageProvider,
+                Center(
+                  child: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 55,
+                        backgroundImage: profileImage != null
+                            ? FileImage(profileImage!)
+                            : const AssetImage('assets/profile.png')
+                                  as ImageProvider,
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 4,
+                        child: CircleAvatar(
+                          backgroundColor: Colors.green,
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.edit,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            onPressed: _pickAndSaveImage,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                Positioned(
-                  bottom: 0,
-                  right: 4,
-                  child: CircleAvatar(
-                    backgroundColor: Colors.green,
-                    child: IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.white, size: 18),
-                      onPressed: _pickAndSaveImage,
+                const SizedBox(height: 24),
+                TextField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'الاسم',
+                    border: OutlineInputBorder(),
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: gender,
+                  decoration: const InputDecoration(
+                    labelText: 'الجنس',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'ذكر', child: Text('ذكر')),
+                    DropdownMenuItem(value: 'أنثى', child: Text('أنثى')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setState(() => gender = value);
+                  },
+                ),
+                const SizedBox(height: 16),
+                InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'تاريخ الميلاد',
+                    border: OutlineInputBorder(),
+                  ),
+                  child: InkWell(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: birthDate ?? DateTime(2000),
+                        firstDate: DateTime(1950),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) {
+                        setState(() => birthDate = picked);
+                      }
+                    },
+                    child: Text(
+                      birthDate != null
+                          ? '${birthDate!.year}/${birthDate!.month}/${birthDate!.day}'
+                          : 'اختر تاريخ',
+                      textAlign: TextAlign.right,
                     ),
                   ),
                 ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: _saveProfileData,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                  ),
+                  child: const Text('حفظ المعلومات'),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: () {
+                    SmoothPageTransition.navigateTo(
+                      context,
+                      const ChangePasswordPage(),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
+                  child: const Text('تغيير كلمة المرور'),
+                ),
               ],
             ),
-          ),
-          const SizedBox(height: 24),
-          TextField(
-            controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: 'الاسم',
-              border: OutlineInputBorder(),
-            ),
-            textAlign: TextAlign.right,
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            value: gender,
-            decoration: const InputDecoration(
-              labelText: 'الجنس',
-              border: OutlineInputBorder(),
-            ),
-            items: const [
-              DropdownMenuItem(value: 'ذكر', child: Text('ذكر')),
-              DropdownMenuItem(value: 'أنثى', child: Text('أنثى')),
-            ],
-            onChanged: (value) {
-              if (value != null) setState(() => gender = value);
-            },
-          ),
-          const SizedBox(height: 16),
-          InputDecorator(
-            decoration: const InputDecoration(
-              labelText: 'تاريخ الميلاد',
-              border: OutlineInputBorder(),
-            ),
-            child: InkWell(
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: birthDate ?? DateTime(2000),
-                  firstDate: DateTime(1950),
-                  lastDate: DateTime.now(),
-                );
-                if (picked != null) {
-                  setState(() => birthDate = picked);
-                }
-              },
-              child: Text(
-                birthDate != null
-                    ? '${birthDate!.year}/${birthDate!.month}/${birthDate!.day}'
-                    : 'اختر تاريخ',
-                textAlign: TextAlign.right,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _saveProfileData,
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('حفظ المعلومات'),
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton(
-            onPressed: () {
-              SmoothPageTransition.navigateTo(
-                context,
-                const ChangePasswordPage(),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
-            child: const Text('تغيير كلمة المرور'),
-          ),
-        ],
-      ),
     );
   }
 }

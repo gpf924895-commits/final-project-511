@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:new_project/provider/lecture_provider.dart';
 import 'package:new_project/provider/prayer_times_provider.dart';
 import 'package:new_project/provider/location_provider.dart';
+import 'package:new_project/provider/pro_login.dart';
 import 'fiqh_section.dart';
 import 'hadith_section.dart';
 import 'tafsir_section.dart';
@@ -23,6 +24,10 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  // State for user interactions
+  final Set<String> _bookmarkedLectures = <String>{};
+  final Set<String> _likedLectures = <String>{};
+
   @override
   void initState() {
     super.initState();
@@ -35,27 +40,52 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadPrayerTimes() async {
-    final locationProvider = Provider.of<LocationProvider>(context, listen: false);
-    final prayerTimesProvider = Provider.of<PrayerTimesProvider>(context, listen: false);
-    
+    final locationProvider = Provider.of<LocationProvider>(
+      context,
+      listen: false,
+    );
+    final prayerTimesProvider = Provider.of<PrayerTimesProvider>(
+      context,
+      listen: false,
+    );
+
     // Get current location
     await locationProvider.getCurrentLocation();
-    
+
     // Calculate prayer times based on location
     if (locationProvider.currentPosition != null) {
-      await prayerTimesProvider.calculatePrayerTimes(locationProvider.currentPosition);
+      await prayerTimesProvider.calculatePrayerTimes(
+        locationProvider.currentPosition,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final authProvider = Provider.of<AuthProvider>(context);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.green,
-        title: const Text('الرئيسية'),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('الرئيسية'),
+            if (authProvider.isGuest) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text('وضع الضيف', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ],
+        ),
         centerTitle: true,
       ),
       drawer: AppDrawer(toggleTheme: widget.toggleTheme),
@@ -67,16 +97,14 @@ class _HomePageState extends State<HomePage> {
               Center(
                 child: Column(
                   children: [
-                    Image.asset(
-                      'assets/logo.png',
-                      width: 80,
-                      height: 80,
-                    ),
+                    Image.asset('assets/logo.png', width: 80, height: 80),
                     const SizedBox(height: 8),
                     const Text(
                       'محاضرات',
-                      style:
-                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
@@ -88,21 +116,25 @@ class _HomePageState extends State<HomePage> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     CategoryIcon(
-                        title: 'الحديث',
-                        icon: Icons.auto_stories,
-                        isDarkMode: isDarkMode),
+                      title: 'الحديث',
+                      icon: Icons.auto_stories,
+                      isDarkMode: isDarkMode,
+                    ),
                     CategoryIcon(
-                        title: 'التفسير',
-                        icon: Icons.menu_book,
-                        isDarkMode: isDarkMode),
+                      title: 'التفسير',
+                      icon: Icons.menu_book,
+                      isDarkMode: isDarkMode,
+                    ),
                     CategoryIcon(
-                        title: 'السيرة',
-                        icon: Icons.book,
-                        isDarkMode: isDarkMode),
+                      title: 'السيرة',
+                      icon: Icons.book,
+                      isDarkMode: isDarkMode,
+                    ),
                     CategoryIcon(
-                        title: 'الفقه',
-                        icon: Icons.library_books,
-                        isDarkMode: isDarkMode),
+                      title: 'الفقه',
+                      icon: Icons.library_books,
+                      isDarkMode: isDarkMode,
+                    ),
                   ],
                 ),
               ),
@@ -111,6 +143,80 @@ class _HomePageState extends State<HomePage> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: _buildPrayerTimesSection(),
+              ),
+              const SizedBox(height: 24),
+              // My List section for signed-in users
+              Consumer<AuthProvider>(
+                builder: (context, auth, child) {
+                  if (auth.canInteract) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'قائمتي',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () => _showMyList(context),
+                                child: const Text('عرض الكل'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (_bookmarkedLectures.isNotEmpty ||
+                              _likedLectures.isNotEmpty)
+                            Container(
+                              height: 60,
+                              child: ListView(
+                                scrollDirection: Axis.horizontal,
+                                children: [
+                                  if (_bookmarkedLectures.isNotEmpty)
+                                    _buildQuickActionCard(
+                                      'المحاضرات المحفوظة',
+                                      Icons.bookmark,
+                                      Colors.blue,
+                                      _bookmarkedLectures.length,
+                                    ),
+                                  if (_likedLectures.isNotEmpty)
+                                    _buildQuickActionCard(
+                                      'المحاضرات المعجبة',
+                                      Icons.favorite,
+                                      Colors.red,
+                                      _likedLectures.length,
+                                    ),
+                                ],
+                              ),
+                            )
+                          else
+                            Container(
+                              height: 60,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  'ابدأ بحفظ المحاضرات المفضلة',
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
               ),
               const SizedBox(height: 24),
               // خريطة المسجد النبوي
@@ -122,9 +228,10 @@ class _HomePageState extends State<HomePage> {
                     const Text(
                       'خريطة المسجد النبوي',
                       style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green),
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     MosqueMapPreview(toggleTheme: widget.toggleTheme),
@@ -138,7 +245,7 @@ class _HomePageState extends State<HomePage> {
                 child: Consumer<LectureProvider>(
                   builder: (context, lectureProvider, child) {
                     final recentLectures = lectureProvider.recentLectures;
-                    
+
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -148,16 +255,21 @@ class _HomePageState extends State<HomePage> {
                             const Text(
                               'المضافة مؤخرًا',
                               style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.green),
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
                             ),
                             if (recentLectures.isNotEmpty)
                               TextButton(
                                 onPressed: () {
                                   lectureProvider.loadAllSections();
                                 },
-                                child: const Icon(Icons.refresh, size: 20, color: Colors.green),
+                                child: const Icon(
+                                  Icons.refresh,
+                                  size: 20,
+                                  color: Colors.green,
+                                ),
                               ),
                           ],
                         ),
@@ -172,7 +284,11 @@ class _HomePageState extends State<HomePage> {
                               child: Center(
                                 child: Column(
                                   children: [
-                                    Icon(Icons.library_books, size: 48, color: Colors.grey[400]),
+                                    Icon(
+                                      Icons.library_books,
+                                      size: 48,
+                                      color: Colors.grey[400],
+                                    ),
                                     const SizedBox(height: 8),
                                     Text(
                                       'لا توجد محاضرات بعد',
@@ -200,42 +316,95 @@ class _HomePageState extends State<HomePage> {
                                 sectionIcon = Icons.book;
                                 break;
                             }
-                            
+
                             return Card(
                               margin: const EdgeInsets.only(bottom: 8),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: Colors.green,
-                                  child: Icon(sectionIcon, color: Colors.white),
-                                ),
-                                title: Text(lecture['title']),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      lecture['description'],
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'القسم: ${lecture['section']}',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.green,
-                                        fontWeight: FontWeight.bold,
+                              child: Consumer<AuthProvider>(
+                                builder: (context, auth, child) {
+                                  final canInteract = auth.canInteract;
+                                  return ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: Colors.green,
+                                      child: Icon(
+                                        sectionIcon,
+                                        color: Colors.white,
                                       ),
                                     ),
-                                  ],
-                                ),
-                                trailing: lecture['video_path'] != null
-                                    ? const Icon(Icons.video_library, color: Colors.green)
-                                    : null,
-                                onTap: () {
-                                  _showLectureDetails(context, lecture);
+                                    title: Text(lecture['title']),
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          lecture['description'],
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'القسم: ${lecture['section']}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.green,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        // Bookmark button for signed-in users
+                                        IconButton(
+                                          onPressed: canInteract
+                                              ? () => _toggleBookmark(
+                                                  lecture['id'],
+                                                )
+                                              : null,
+                                          icon: Icon(
+                                            _isBookmarked(lecture['id'])
+                                                ? Icons.bookmark
+                                                : Icons.bookmark_border,
+                                            color: canInteract
+                                                ? Colors.green
+                                                : Colors.grey,
+                                          ),
+                                          tooltip: canInteract
+                                              ? 'حفظ المحاضرة'
+                                              : 'سجّل الدخول للحفظ',
+                                        ),
+                                        // Like button for signed-in users
+                                        IconButton(
+                                          onPressed: canInteract
+                                              ? () => _toggleLike(lecture['id'])
+                                              : null,
+                                          icon: Icon(
+                                            _isLiked(lecture['id'])
+                                                ? Icons.favorite
+                                                : Icons.favorite_border,
+                                            color: canInteract
+                                                ? Colors.red
+                                                : Colors.grey,
+                                          ),
+                                          tooltip: canInteract
+                                              ? 'إعجاب'
+                                              : 'سجّل الدخول للإعجاب',
+                                        ),
+                                        // Video indicator
+                                        if (lecture['video_path'] != null)
+                                          const Icon(
+                                            Icons.video_library,
+                                            color: Colors.green,
+                                          ),
+                                      ],
+                                    ),
+                                    onTap: () {
+                                      _showLectureDetails(context, lecture);
+                                    },
+                                  );
                                 },
                               ),
                             );
@@ -252,10 +421,14 @@ class _HomePageState extends State<HomePage> {
       bottomNavigationBar: BottomNavigationBar(
         items: const [
           BottomNavigationBarItem(
-              icon: Icon(Icons.notifications), label: 'الإشعارات'),
+            icon: Icon(Icons.notifications),
+            label: 'الإشعارات',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
           BottomNavigationBarItem(
-              icon: Icon(Icons.settings), label: 'الإعدادات'),
+            icon: Icon(Icons.settings),
+            label: 'الإعدادات',
+          ),
         ],
         selectedItemColor: Colors.green,
         unselectedItemColor: Colors.grey,
@@ -263,12 +436,14 @@ class _HomePageState extends State<HomePage> {
         onTap: (index) {
           if (index == 0) {
             SmoothPageTransition.navigateTo(
-                context,
-                NotificationsPage(toggleTheme: widget.toggleTheme));
+              context,
+              NotificationsPage(toggleTheme: widget.toggleTheme),
+            );
           } else if (index == 2) {
             SmoothPageTransition.navigateTo(
-                context,
-                SettingsPage(toggleTheme: widget.toggleTheme));
+              context,
+              SettingsPage(toggleTheme: widget.toggleTheme),
+            );
           }
         },
       ),
@@ -292,7 +467,8 @@ class _HomePageState extends State<HomePage> {
           );
         }
 
-        if (prayerTimesProvider.errorMessage != null || locationProvider.errorMessage != null) {
+        if (prayerTimesProvider.errorMessage != null ||
+            locationProvider.errorMessage != null) {
           return Card(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -301,10 +477,16 @@ class _HomePageState extends State<HomePage> {
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
-                  const Icon(Icons.error_outline, color: Colors.orange, size: 40),
+                  const Icon(
+                    Icons.error_outline,
+                    color: Colors.orange,
+                    size: 40,
+                  ),
                   const SizedBox(height: 8),
                   Text(
-                    prayerTimesProvider.errorMessage ?? locationProvider.errorMessage ?? 'خطأ في تحميل أوقات الصلاة',
+                    prayerTimesProvider.errorMessage ??
+                        locationProvider.errorMessage ??
+                        'خطأ في تحميل أوقات الصلاة',
                     style: const TextStyle(color: Colors.orange),
                     textAlign: TextAlign.center,
                   ),
@@ -343,7 +525,11 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.green, size: 20),
+                  icon: const Icon(
+                    Icons.refresh,
+                    color: Colors.green,
+                    size: 20,
+                  ),
                   onPressed: _loadPrayerTimes,
                 ),
               ],
@@ -497,7 +683,10 @@ class _HomePageState extends State<HomePage> {
                     Flexible(
                       child: Text(
                         'بتوقيت ${locationProvider.locationName}',
-                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -530,11 +719,7 @@ class _HomePageState extends State<HomePage> {
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            color: isNext ? Colors.green : Colors.grey,
-            size: 20,
-          ),
+          Icon(icon, color: isNext ? Colors.green : Colors.grey, size: 20),
           const SizedBox(height: 4),
           Text(
             arabicName,
@@ -615,7 +800,10 @@ class _HomePageState extends State<HomePage> {
                     SizedBox(width: 8),
                     Text(
                       'يحتوي على فيديو',
-                      style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
@@ -637,6 +825,172 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
+  // Helper methods for user interactions
+  bool _isBookmarked(String lectureId) {
+    return _bookmarkedLectures.contains(lectureId);
+  }
+
+  bool _isLiked(String lectureId) {
+    return _likedLectures.contains(lectureId);
+  }
+
+  void _toggleBookmark(String lectureId) {
+    setState(() {
+      if (_bookmarkedLectures.contains(lectureId)) {
+        _bookmarkedLectures.remove(lectureId);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تم إلغاء حفظ المحاضرة')));
+      } else {
+        _bookmarkedLectures.add(lectureId);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تم حفظ المحاضرة')));
+      }
+    });
+  }
+
+  void _toggleLike(String lectureId) {
+    setState(() {
+      if (_likedLectures.contains(lectureId)) {
+        _likedLectures.remove(lectureId);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تم إلغاء الإعجاب')));
+      } else {
+        _likedLectures.add(lectureId);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تم الإعجاب بالمحاضرة')));
+      }
+    });
+  }
+
+  Widget _buildQuickActionCard(
+    String title,
+    IconData icon,
+    Color color,
+    int count,
+  ) {
+    return Container(
+      width: 140,
+      margin: const EdgeInsets.only(right: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: InkWell(
+        onTap: () => _showMyList(context),
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
+                    ),
+                    Text(
+                      '$count عنصر',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: color.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showMyList(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('قائمتي'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_bookmarkedLectures.isNotEmpty) ...[
+                const Text(
+                  'المحاضرات المحفوظة',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                ..._bookmarkedLectures.map(
+                  (id) => ListTile(
+                    leading: const Icon(Icons.bookmark, color: Colors.blue),
+                    title: Text('محاضرة $id'),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.remove_circle, color: Colors.red),
+                      onPressed: () {
+                        setState(() {
+                          _bookmarkedLectures.remove(id);
+                        });
+                        Navigator.pop(context);
+                        _showMyList(context); // Refresh dialog
+                      },
+                    ),
+                  ),
+                ),
+                const Divider(),
+              ],
+              if (_likedLectures.isNotEmpty) ...[
+                const Text(
+                  'المحاضرات المعجبة',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                ..._likedLectures.map(
+                  (id) => ListTile(
+                    leading: const Icon(Icons.favorite, color: Colors.red),
+                    title: Text('محاضرة $id'),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.remove_circle, color: Colors.red),
+                      onPressed: () {
+                        setState(() {
+                          _likedLectures.remove(id);
+                        });
+                        Navigator.pop(context);
+                        _showMyList(context); // Refresh dialog
+                      },
+                    ),
+                  ),
+                ),
+              ],
+              if (_bookmarkedLectures.isEmpty && _likedLectures.isEmpty)
+                const Text('لا توجد عناصر في قائمتك'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إغلاق'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class CategoryIcon extends StatelessWidget {
@@ -644,12 +998,12 @@ class CategoryIcon extends StatelessWidget {
   final IconData icon;
   final bool isDarkMode;
 
-  const CategoryIcon(
-      {Key? key,
-      required this.title,
-      required this.icon,
-      required this.isDarkMode})
-      : super(key: key);
+  const CategoryIcon({
+    Key? key,
+    required this.title,
+    required this.icon,
+    required this.isDarkMode,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -658,27 +1012,40 @@ class CategoryIcon extends StatelessWidget {
         // Get toggleTheme from parent
         final homePageState = context.findAncestorStateOfType<_HomePageState>();
         final toggleTheme = homePageState?.widget.toggleTheme;
-        
+
         switch (title) {
           case 'الفقه':
             SmoothPageTransition.navigateTo(
-                context,
-                FiqhSectionPage(isDarkMode: isDarkMode, toggleTheme: toggleTheme));
+              context,
+              FiqhSectionPage(isDarkMode: isDarkMode, toggleTheme: toggleTheme),
+            );
             break;
           case 'الحديث':
             SmoothPageTransition.navigateTo(
-                context,
-                HadithSectionPage(isDarkMode: isDarkMode, toggleTheme: toggleTheme));
+              context,
+              HadithSectionPage(
+                isDarkMode: isDarkMode,
+                toggleTheme: toggleTheme,
+              ),
+            );
             break;
           case 'التفسير':
             SmoothPageTransition.navigateTo(
-                context,
-                TafsirSectionPage(isDarkMode: isDarkMode, toggleTheme: toggleTheme));
+              context,
+              TafsirSectionPage(
+                isDarkMode: isDarkMode,
+                toggleTheme: toggleTheme,
+              ),
+            );
             break;
           case 'السيرة':
             SmoothPageTransition.navigateTo(
-                context,
-                SeerahSectionPage(isDarkMode: isDarkMode, toggleTheme: toggleTheme));
+              context,
+              SeerahSectionPage(
+                isDarkMode: isDarkMode,
+                toggleTheme: toggleTheme,
+              ),
+            );
             break;
         }
       },

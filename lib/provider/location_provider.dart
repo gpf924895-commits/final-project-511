@@ -16,7 +16,7 @@ class LocationProvider extends ChangeNotifier {
   Future<bool> requestLocationPermission() async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
-      
+
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
@@ -27,7 +27,8 @@ class LocationProvider extends ChangeNotifier {
       }
 
       if (permission == LocationPermission.deniedForever) {
-        _errorMessage = 'تم رفض إذن الموقع نهائياً. يرجى السماح بالوصول من الإعدادات';
+        _errorMessage =
+            'تم رفض إذن الموقع نهائياً. يرجى السماح بالوصول من الإعدادات';
         notifyListeners();
         return false;
       }
@@ -77,7 +78,7 @@ class LocationProvider extends ChangeNotifier {
           position.latitude,
           position.longitude,
         );
-        
+
         if (placemarks.isNotEmpty) {
           Placemark place = placemarks.first;
           _locationName = _formatLocationName(place);
@@ -99,26 +100,26 @@ class LocationProvider extends ChangeNotifier {
 
   String _formatLocationName(Placemark place) {
     List<String> parts = [];
-    
+
     if (place.locality?.isNotEmpty == true) {
-      parts.add(place.locality!);
+      parts.add(place.locality ?? '');
     }
     if (place.administrativeArea?.isNotEmpty == true) {
-      parts.add(place.administrativeArea!);
+      parts.add(place.administrativeArea ?? '');
     }
     if (place.country?.isNotEmpty == true) {
-      parts.add(place.country!);
+      parts.add(place.country ?? '');
     }
-    
+
     return parts.isNotEmpty ? parts.join(', ') : 'الموقع الحالي';
   }
 
   Future<double> calculateDistance(double lat, double lng) async {
     if (_currentPosition == null) return 0.0;
-    
+
     return Geolocator.distanceBetween(
-      _currentPosition!.latitude,
-      _currentPosition!.longitude,
+      _currentPosition?.latitude ?? 0.0,
+      _currentPosition?.longitude ?? 0.0,
       lat,
       lng,
     );
@@ -126,7 +127,7 @@ class LocationProvider extends ChangeNotifier {
 
   Future<String> getDistanceString(double lat, double lng) async {
     double distance = await calculateDistance(lat, lng);
-    
+
     if (distance < 1000) {
       return '${distance.toStringAsFixed(0)} متر';
     } else {

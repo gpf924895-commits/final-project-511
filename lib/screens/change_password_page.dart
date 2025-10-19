@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../database/firebase_service.dart';
 import '../provider/pro_login.dart';
+import '../utils/auth_guard.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -11,11 +12,25 @@ class ChangePasswordPage extends StatefulWidget {
 }
 
 class _ChangePasswordPageState extends State<ChangePasswordPage> {
-  final TextEditingController _currentPasswordController = TextEditingController();
+  final TextEditingController _currentPasswordController =
+      TextEditingController();
   final TextEditingController _newPasswordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
   final FirebaseService _firebaseService = FirebaseService();
   final _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    // Check authentication when page loads
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final isAuthenticated = await AuthGuard.requireAuth(context);
+      if (!isAuthenticated && mounted) {
+        Navigator.of(context).pop();
+      }
+    });
+  }
 
   Future<void> _changePassword() async {
     if (!_formKey.currentState!.validate()) {

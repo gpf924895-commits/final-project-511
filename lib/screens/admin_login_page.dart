@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:new_project/provider/pro_login.dart';
-import 'package:new_project/screens/Admin_home_page.dart';
-import '../utils/page_transition.dart';
 
 class AdminLoginPage extends StatefulWidget {
   const AdminLoginPage({super.key});
@@ -35,29 +33,43 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
 
   void _login() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
+
     final success = await authProvider.loginAdmin(
       username: _usernameController.text.trim(),
       password: _passwordController.text,
     );
 
     if (success && mounted) {
-      // Check if currentUser is not null before navigating
+      // Check if currentUser is not null and has admin role
       if (authProvider.currentUser != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم تسجيل دخول المشرف بنجاح'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
-        // Navigate to Admin Panel Page with admin data and remove all previous routes
-        SmoothPageTransition.navigateAndRemoveUntil(
-          context,
-          AdminPanelPage(
-            admin: authProvider.currentUser!,
-          ),
-        );
+        // Verify admin role
+        final isAdmin = authProvider.currentUser?['is_admin'] == true;
+
+        if (!isAdmin) {
+          // Not an admin - sign out and show error
+          await authProvider.signOut();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('هذا الحساب لا يملك صلاحيات المشرف.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم تسجيل دخول المشرف بنجاح'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          // Navigate to Admin Panel using named route
+          Navigator.pushReplacementNamed(context, '/admin_panel');
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -100,12 +112,19 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
             const SizedBox(height: 16),
             const Text(
               'تسجيل دخول المشرف',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green),
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.green,
+              ),
             ),
             const SizedBox(height: 24),
             TextField(
               controller: _usernameController,
-              decoration: const InputDecoration(labelText: 'اسم المستخدم', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                labelText: 'اسم المستخدم',
+                border: OutlineInputBorder(),
+              ),
               textAlign: TextAlign.right,
             ),
             const SizedBox(height: 16),
@@ -116,7 +135,9 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                 labelText: 'كلمة المرور',
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
-                  icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
+                  icon: Icon(
+                    _obscure ? Icons.visibility_off : Icons.visibility,
+                  ),
                   onPressed: () => setState(() => _obscure = !_obscure),
                 ),
               ),
@@ -131,10 +152,13 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                         onPressed: _login,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
                           minimumSize: const Size(double.infinity, 48),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
                         ),
-                        child: const Text('دخول'),
+                        child: const Text('تسجيل الدخول'),
                       );
               },
             ),
