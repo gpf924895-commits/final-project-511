@@ -1,19 +1,127 @@
-# new_project
+# Islamic Learning App
 
-A new Flutter project.
+A comprehensive Flutter application for Islamic education with multi-role support including Admin, Sheikh, and Guest users. The app features Firebase integration, interactive maps, prayer times, and a complete lecture management system.
+
+## Features
+
+### 🕌 Core Features
+- **Multi-Role Authentication**: Admin, Sheikh, and Guest user roles
+- **Interactive Mosque Map**: Google Maps integration with mosque locations
+- **Prayer Times**: Accurate prayer time calculations with location services
+- **Lecture Management**: Complete CRUD operations for Islamic lectures
+- **Chapter & Lesson System**: Organized content structure for sheikhs
+- **Guest Mode**: Public access to Islamic content without registration
+
+### 👨‍💼 Admin Features
+- Sheikh management and approval system
+- User role management
+- Content moderation
+- Analytics and reporting
+
+### 👨‍🏫 Sheikh Features
+- Lecture creation and management
+- Chapter and lesson organization
+- Content upload and editing
+- Dashboard with analytics
+
+### 👤 Guest Features
+- Browse Islamic content
+- Access to public lectures
+- Map-based mosque finder
+- Prayer time notifications
+
+## Technology Stack
+
+- **Frontend**: Flutter 3.8.1
+- **Backend**: Firebase (Firestore, Authentication, Storage, Functions)
+- **Maps**: Google Maps Flutter
+- **State Management**: Provider
+- **Testing**: Flutter Test Framework
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+### Prerequisites
+- Flutter SDK 3.8.1 or higher
+- Firebase project setup
+- Google Maps API key
 
-A few resources to get you started if this is your first Flutter project:
+### Installation
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd new_project
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+2. Install dependencies:
+```bash
+flutter pub get
+```
+
+3. Configure Firebase:
+   - Add your `google-services.json` (Android) and `GoogleService-Info.plist` (iOS)
+   - Update Firebase configuration in `lib/firebase_options.dart`
+
+4. Set up Google Maps:
+   - Add your Google Maps API key to platform-specific configuration files
+
+5. Run the application:
+```bash
+flutter run
+```
+
+## Firebase Setup
+
+### Required Firestore Indexes
+
+The application requires specific Firestore indexes for optimal performance:
+
+#### 1. Sheikh List (Admin Panel)
+- **Collection**: `users`
+- **Fields**: `role` (Ascending), `createdAt` (Descending)
+
+#### 2. Sheikhs Collection
+- **Collection Group**: `sheikhs`
+- **Fields**: `enabled` (Ascending), `createdAt` (Ascending)
+
+See `FIRESTORE_INDEXES.md` for detailed setup instructions.
+
+## Project Structure
+
+```
+lib/
+├── database/          # Firebase service layer
+├── provider/          # State management providers
+├── screens/           # UI screens and pages
+├── services/          # Business logic services
+├── utils/             # Utility functions and helpers
+└── widgets/           # Reusable UI components
+```
+
+## Testing
+
+The project includes comprehensive test coverage:
+- Unit tests for providers and services
+- Widget tests for UI components
+- Integration tests for user flows
+- Navigation and authentication tests
+
+Run tests with:
+```bash
+flutter test
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Firestore Indexes Required
 
