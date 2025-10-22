@@ -19,7 +19,7 @@ class SheikhGuard extends StatelessWidget {
           );
         }
 
-        // Check if user is authenticated
+        // Check if user is authenticated (works with app session role)
         if (!authProvider.isAuthenticated || authProvider.currentUser == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Navigator.pushNamedAndRemoveUntil(

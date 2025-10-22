@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:new_project/database/firebase_service.dart';
 import 'package:new_project/services/subcategory_service.dart';
+import 'package:new_project/services/sheikh_auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 
@@ -568,7 +569,11 @@ class AuthProvider extends ChangeNotifier {
       // Only allow 'user' role for this login method
       if (role != 'user') {
         await _auth.signOut();
-        _errorMessage = 'يرجى استخدام تسجيل دخول الشيوخ';
+        if (role == 'sheikh') {
+          _errorMessage = 'هذا الحساب خاص بالشيوخ. الرجاء الدخول برقم الشيخ';
+        } else {
+          _errorMessage = 'يرجى استخدام تسجيل دخول الشيوخ';
+        }
         _isLoading = false;
         notifyListeners();
         return;
@@ -621,168 +626,60 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // Sheikh login using uniqueId + password only (no Firebase Auth)
   Future<bool> loginSheikhWithUniqueId(String uniqueId, String password) async {
     try {
       _setLoading(true);
       _setError(null);
 
-      if (uniqueId.trim().isEmpty || password.trim().isEmpty) {
-        throw Exception('الرجاء إدخال رقم الشيخ وكلمة المرور');
-      }
+      // Import SheikhAuthService
+      final sheikhAuthService = SheikhAuthService();
 
-      final normalized = uniqueId.trim().replaceAll(RegExp(r'[^0-9]'), '');
-      if (normalized.isEmpty) {
-        throw Exception('رقم الشيخ غير صحيح');
-      }
-      final sheikhId = normalized.padLeft(8, '0');
+      // Use the service to authenticate
+      final result = await sheikhAuthService.authenticateSheikh(
+        uniqueId,
+        password,
+      );
 
-      QuerySnapshot querySnapshot;
-      try {
-        querySnapshot = await _firestore
-            .collection('sheikhs')
-            .where('sheikhId', isEqualTo: sheikhId)
-            .limit(1)
-            .get()
-            .timeout(const Duration(seconds: 8));
-      } on FirebaseException catch (e) {
-        if (e.code == 'failed-precondition') {
-          final allSheikhs = await _firestore
-              .collection('sheikhs')
-              .get()
-              .timeout(const Duration(seconds: 8));
+      if (result['success'] == true) {
+        final sheikhData = result['sheikh'] as Map<String, dynamic>;
 
-          final matchingDocs = allSheikhs.docs
-              .where((doc) => doc.data()['sheikhId'] == sheikhId)
-              .toList();
+        // Set Sheikh session without Firebase Auth
+        _currentUser = {
+          'uid': sheikhData['uid'],
+          'name': sheikhData['name'],
+          'email': sheikhData['email'],
+          'role': 'sheikh',
+          'sheikhId': sheikhData['uniqueId'],
+          'category': sheikhData['category'],
+          'isActive': sheikhData['isActive'],
+        };
 
-          if (matchingDocs.isEmpty) {
-            throw Exception('رقم الشيخ أو كلمة المرور غير صحيحة');
-          }
-
-          final sheikhDoc = matchingDocs.first;
-          final sheikhData = sheikhDoc.data() as Map<String, dynamic>?;
-
-          if (sheikhData == null) {
-            throw Exception('تم تعطيل الحساب');
-          }
-
-          final email = sheikhData['email'] as String?;
-          if (email == null || email.isEmpty) {
-            throw Exception('تم تعطيل الحساب');
-          }
-
-          try {
-            final userCredential = await _auth.signInWithEmailAndPassword(
-              email: email,
-              password: password,
-            );
-
-            if (userCredential.user == null) {
-              throw Exception('فشل في إنشاء الحساب');
-            }
-            final uid = userCredential.user?.uid;
-            if (uid == null) {
-              throw Exception('فشل في إنشاء الحساب');
-            }
-            _isLoggedIn = true;
-            _isGuest = false;
-            _currentUser = {
-              'uid': uid,
-              'name': sheikhData['name'] ?? 'شيخ',
-              'email': email,
-              'role': 'sheikh',
-              'sheikhId': sheikhId,
-              'categoryId': sheikhData['categoryId'],
-            };
-            _errorMessage = null;
-            _isLoading = false;
-            _isReady = true;
-            notifyListeners();
-            return true;
-          } on FirebaseAuthException catch (authError) {
-            switch (authError.code) {
-              case 'user-not-found':
-              case 'invalid-email':
-                throw Exception('رقم الشيخ أو كلمة المرور غير صحيحة');
-              case 'wrong-password':
-                throw Exception('كلمة المرور غير صحيحة');
-              case 'user-disabled':
-                throw Exception('تم تعطيل الحساب');
-              default:
-                throw Exception('فشل تسجيل الدخول: ${authError.message}');
-            }
-          }
-        }
-        rethrow;
-      }
-
-      if (querySnapshot.docs.isEmpty) {
-        throw Exception('رقم الشيخ أو كلمة المرور غير صحيحة');
-      }
-
-      final sheikhDoc = querySnapshot.docs.first;
-      final sheikhData = sheikhDoc.data() as Map<String, dynamic>?;
-
-      if (sheikhData == null) {
-        throw Exception('تم تعطيل الحساب');
-      }
-
-      final email = sheikhData['email'] as String?;
-      if (email == null || email.isEmpty) {
-        throw Exception('تم تعطيل الحساب');
-      }
-
-      try {
-        final userCredential = await _auth.signInWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-
-        if (userCredential.user == null) {
-          throw Exception('فشل في إنشاء الحساب');
-        }
-        final uid = userCredential.user?.uid;
-        if (uid == null) {
-          throw Exception('فشل في إنشاء الحساب');
-        }
         _isLoggedIn = true;
         _isGuest = false;
-        _currentUser = {
-          'uid': uid,
-          'name': sheikhData['name'] ?? 'شيخ',
-          'email': email,
-          'role': 'sheikh',
-          'sheikhId': sheikhId,
-          'categoryId': sheikhData['categoryId'],
-        };
         _errorMessage = null;
         _isLoading = false;
         _isReady = true;
+
+        // Save session to SharedPreferences
+        await _saveSessionToPrefs();
+
         notifyListeners();
         return true;
-      } on FirebaseAuthException catch (authError) {
-        switch (authError.code) {
-          case 'user-not-found':
-          case 'invalid-email':
-            throw Exception('رقم الشيخ أو كلمة المرور غير صحيحة');
-          case 'wrong-password':
-            throw Exception('كلمة المرور غير صحيحة');
-          case 'user-disabled':
-            throw Exception('تم تعطيل الحساب');
-          default:
-            throw Exception('فشل تسجيل الدخول: ${authError.message}');
-        }
+      } else {
+        _isLoggedIn = false;
+        _isGuest = true;
+        _currentUser = null;
+        _errorMessage =
+            result['message'] ?? 'رقم الشيخ أو كلمة المرور غير صحيحة';
+        _isLoading = false;
+        notifyListeners();
+        return false;
       }
-    } on TimeoutException {
-      _isLoading = false;
-      _isLoggedIn = false;
-      _currentUser = null;
-      _errorMessage = 'انتهت المهلة. تحقق من الاتصال وحاول مجددًا.';
-      notifyListeners();
-      return false;
     } catch (e) {
       _isLoading = false;
       _isLoggedIn = false;
+      _isGuest = true;
       _currentUser = null;
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
       notifyListeners();
@@ -820,6 +717,8 @@ class AuthProvider extends ChangeNotifier {
       await prefs.remove('username');
       await prefs.remove('email');
       await prefs.remove('is_logged_in');
+      await prefs.remove('sheikh_id');
+      await prefs.remove('sheikh_uid');
       print('[AuthProvider] Session cleared from SharedPreferences');
     } catch (e) {
       print('[AuthProvider] Error clearing session: $e');
@@ -899,6 +798,13 @@ class AuthProvider extends ChangeNotifier {
         await prefs.setString('username', _currentUser!['username'] ?? '');
         await prefs.setString('email', _currentUser!['email'] ?? '');
         await prefs.setBool('is_logged_in', _isLoggedIn);
+
+        // Save Sheikh-specific data
+        if (_currentUser!['role'] == 'sheikh') {
+          await prefs.setString('sheikh_id', _currentUser!['sheikhId'] ?? '');
+          await prefs.setString('sheikh_uid', _currentUser!['uid'] ?? '');
+        }
+
         print('[AuthProvider] Session saved to SharedPreferences');
       }
     } catch (e) {
@@ -917,15 +823,33 @@ class AuthProvider extends ChangeNotifier {
       final email = prefs.getString('email') ?? '';
 
       if (isLoggedIn && role.isNotEmpty) {
-        _currentUser = {
-          'uid': 'admin_$username',
-          'name': username,
-          'email': email,
-          'role': role,
-          'username': username,
-          'is_admin': isAdmin,
-          'status': 'active', // Ensure status is set
-        };
+        if (role == 'sheikh') {
+          // Handle Sheikh session
+          final sheikhId = prefs.getString('sheikh_id') ?? '';
+          final sheikhUid = prefs.getString('sheikh_uid') ?? '';
+
+          _currentUser = {
+            'uid': sheikhUid,
+            'name': username.isNotEmpty ? username : 'شيخ',
+            'email': email,
+            'role': 'sheikh',
+            'sheikhId': sheikhId,
+            'is_admin': false,
+            'status': 'active',
+          };
+        } else {
+          // Handle other roles (admin, user, etc.)
+          _currentUser = {
+            'uid': 'admin_$username',
+            'name': username,
+            'email': email,
+            'role': role,
+            'username': username,
+            'is_admin': isAdmin,
+            'status': 'active', // Ensure status is set
+          };
+        }
+
         _isLoggedIn = true;
         _isGuest = false;
 
