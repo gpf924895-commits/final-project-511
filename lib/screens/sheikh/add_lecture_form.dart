@@ -2,17 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:new_project/provider/pro_login.dart';
 import 'package:new_project/provider/lecture_provider.dart';
+import 'package:new_project/provider/hierarchy_provider.dart';
 import 'package:new_project/widgets/sheikh_guard.dart';
+import 'package:new_project/utils/youtube_utils.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 class AddLectureForm extends StatefulWidget {
-  final String categoryKey;
-  final String categoryNameAr;
-
-  const AddLectureForm({
-    super.key,
-    required this.categoryKey,
-    required this.categoryNameAr,
-  });
+  const AddLectureForm({super.key});
 
   @override
   State<AddLectureForm> createState() => _AddLectureFormState();
@@ -31,6 +27,42 @@ class _AddLectureFormState extends State<AddLectureForm> {
   DateTime? _selectedEndDate;
   TimeOfDay? _selectedEndTime;
   bool _hasEndTime = false;
+
+  // YouTube validation state
+  String? _extractedVideoId;
+  bool _isValidYouTubeUrl = false;
+  String? _youtubeValidationError;
+
+  // Hierarchy selection state
+  String? _selectedSection;
+  String? _selectedCategoryId;
+  String? _selectedCategoryName;
+  String? _selectedSubcategoryId;
+  String? _selectedSubcategoryName;
+
+  final List<Map<String, String>> _sections = [
+    {'key': 'fiqh', 'name': 'الفقه'},
+    {'key': 'hadith', 'name': 'الحديث'},
+    {'key': 'seerah', 'name': 'السيرة'},
+    {'key': 'tafsir', 'name': 'التفسير'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Load categories for the selected section when form opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final hierarchyProvider = Provider.of<HierarchyProvider>(
+        context,
+        listen: false,
+      );
+      if (hierarchyProvider.selectedSection != null) {
+        hierarchyProvider.loadCategoriesBySection(
+          hierarchyProvider.selectedSection!,
+        );
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -53,7 +85,7 @@ class _AddLectureFormState extends State<AddLectureForm> {
           appBar: AppBar(
             backgroundColor: Colors.green,
             foregroundColor: Colors.white,
-            title: Text('إضافة محاضرة - ${widget.categoryNameAr}'),
+            title: const Text('إضافة محاضرة'),
             iconTheme: const IconThemeData(color: Colors.white),
             actions: [
               Consumer<LectureProvider>(
@@ -87,8 +119,10 @@ class _AddLectureFormState extends State<AddLectureForm> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Category Info Card
-                  _buildCategoryInfoCard(),
+                  // Hierarchy Selection
+                  _buildSectionTitle('اختيار التصنيف'),
+                  const SizedBox(height: 12),
+                  _buildHierarchySelection(),
                   const SizedBox(height: 24),
 
                   // Basic Information
@@ -134,7 +168,9 @@ class _AddLectureFormState extends State<AddLectureForm> {
                           decoration: BoxDecoration(
                             color: Colors.red[50],
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.red[200] ?? Colors.red),
+                            border: Border.all(
+                              color: Colors.red[200] ?? Colors.red,
+                            ),
                           ),
                           child: Row(
                             children: [
@@ -146,7 +182,8 @@ class _AddLectureFormState extends State<AddLectureForm> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  lectureProvider.errorMessage ?? 'خطأ غير معروف',
+                                  lectureProvider.errorMessage ??
+                                      'خطأ غير معروف',
                                   style: TextStyle(color: Colors.red[700]),
                                 ),
                               ),
@@ -168,46 +205,182 @@ class _AddLectureFormState extends State<AddLectureForm> {
     );
   }
 
-  Widget _buildCategoryInfoCard() {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: LinearGradient(
-            colors: [Colors.green.shade50, Colors.green.shade100],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.category, color: Colors.green.shade700, size: 24),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildHierarchySelection() {
+    return Consumer<HierarchyProvider>(
+      builder: (context, hierarchyProvider, child) {
+        final selectedSection = hierarchyProvider.selectedSection;
+        if (selectedSection == null) {
+          return Card(
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.red[50],
+                border: Border.all(color: Colors.red[200]!),
+              ),
+              child: Row(
                 children: [
-                  Text(
-                    'فئة المحاضرة',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                  ),
-                  Text(
-                    widget.categoryNameAr,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green.shade700,
+                  Icon(Icons.error, color: Colors.red[600], size: 24),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'يرجى اختيار القسم أولاً من صفحة اختيار الفئة',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
+          );
+        }
+
+        return Card(
+          elevation: 4,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: LinearGradient(
+                colors: [Colors.green.shade50, Colors.green.shade100],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.category,
+                      color: Colors.green.shade700,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'اختيار التصنيف',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Section Display (non-editable)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green[100],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green[300]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        color: Colors.green[600],
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'القسم: ${_getSectionNameAr(selectedSection)}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Category Selection
+                Consumer<HierarchyProvider>(
+                  builder: (context, hierarchyProvider, child) {
+                    return DropdownButtonFormField<String>(
+                      value: _selectedCategoryId,
+                      decoration: const InputDecoration(
+                        labelText: 'الفئة *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.folder),
+                      ),
+                      items: hierarchyProvider.categories.map((category) {
+                        return DropdownMenuItem<String>(
+                          value: category['id'] as String?,
+                          child: Text(category['name'] ?? 'بدون اسم'),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedCategoryId = value;
+                          _selectedCategoryName = hierarchyProvider.categories
+                              .firstWhere((cat) => cat['id'] == value)['name'];
+                          _selectedSubcategoryId = null;
+                          _selectedSubcategoryName = null;
+                        });
+                        if (value != null) {
+                          _loadSubcategories(value);
+                        }
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                // Subcategory Selection (Optional)
+                Consumer<HierarchyProvider>(
+                  builder: (context, hierarchyProvider, child) {
+                    return DropdownButtonFormField<String>(
+                      value: _selectedSubcategoryId,
+                      decoration: const InputDecoration(
+                        labelText: 'الفئة الفرعية (اختياري)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.subdirectory_arrow_right),
+                      ),
+                      items: [
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('بدون فئة فرعية'),
+                        ),
+                        ...hierarchyProvider.subcategories.map((subcategory) {
+                          return DropdownMenuItem<String>(
+                            value: subcategory['id'] as String?,
+                            child: Text(subcategory['name'] ?? 'بدون اسم'),
+                          );
+                        }).toList(),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedSubcategoryId = value;
+                          if (value != null) {
+                            _selectedSubcategoryName = hierarchyProvider
+                                .subcategories
+                                .firstWhere(
+                                  (sub) => sub['id'] == value,
+                                )['name'];
+                          } else {
+                            _selectedSubcategoryName = null;
+                          }
+                        });
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -374,20 +547,96 @@ class _AddLectureFormState extends State<AddLectureForm> {
   }
 
   Widget _buildVideoUrlField() {
-    return TextFormField(
-      controller: _videoUrlController,
-      decoration: InputDecoration(
-        labelText: 'رابط الفيديو',
-        hintText: 'أدخل رابط الفيديو',
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        prefixIcon: const Icon(Icons.videocam),
-      ),
-      validator: (value) {
-        if (value != null && value.isNotEmpty && !_isValidUrl(value)) {
-          return 'رابط غير صحيح';
-        }
-        return null;
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextFormField(
+          controller: _videoUrlController,
+          decoration: InputDecoration(
+            labelText: 'رابط الفيديو (يوتيوب)',
+            hintText: 'أدخل رابط فيديو يوتيوب',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            prefixIcon: const Icon(Icons.videocam),
+            suffixIcon: _videoUrlController.text.isNotEmpty
+                ? IconButton(
+                    icon: Icon(
+                      _isValidYouTubeUrl ? Icons.check_circle : Icons.error,
+                      color: _isValidYouTubeUrl ? Colors.green : Colors.red,
+                    ),
+                    onPressed: _validateYouTubeUrl,
+                  )
+                : null,
+          ),
+          onChanged: (value) {
+            setState(() {
+              _isValidYouTubeUrl = false;
+              _extractedVideoId = null;
+              _youtubeValidationError = null;
+            });
+          },
+          validator: (value) {
+            if (value != null && value.isNotEmpty) {
+              if (!YouTubeUtils.isValidYouTubeUrl(value)) {
+                return 'رابط يوتيوب غير صحيح';
+              }
+              if (_youtubeValidationError != null) {
+                return _youtubeValidationError;
+              }
+            }
+            return null;
+          },
+        ),
+        if (_youtubeValidationError != null) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.red[50],
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: Colors.red[200] ?? Colors.red),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.error, color: Colors.red[600], size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _youtubeValidationError!,
+                    style: TextStyle(color: Colors.red[700], fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (_isValidYouTubeUrl && _extractedVideoId != null) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.green[50],
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: Colors.green[200] ?? Colors.green),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green[600], size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'رابط يوتيوب صحيح - معرف الفيديو: $_extractedVideoId',
+                    style: TextStyle(color: Colors.green[700], fontSize: 12),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _previewVideo,
+                  child: const Text('معاينة'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -449,8 +698,149 @@ class _AddLectureFormState extends State<AddLectureForm> {
     return Uri.tryParse(url)?.hasAbsolutePath == true;
   }
 
+  void _validateYouTubeUrl() {
+    final url = _videoUrlController.text.trim();
+    if (url.isEmpty) {
+      setState(() {
+        _isValidYouTubeUrl = false;
+        _extractedVideoId = null;
+        _youtubeValidationError = null;
+      });
+      return;
+    }
+
+    final result = YouTubeUtils.validateAndExtract(url);
+    setState(() {
+      _isValidYouTubeUrl = result['isValid'];
+      _extractedVideoId = result['videoId'];
+      _youtubeValidationError = result['error'];
+    });
+  }
+
+  void _previewVideo() {
+    if (_extractedVideoId == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Dialog(
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            height: MediaQuery.of(context).size.height * 0.6,
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(8),
+                      topRight: Radius.circular(8),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.play_circle, color: Colors.white),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'معاينة الفيديو',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    color: Colors.black,
+                    child: YoutubePlayer(
+                      controller: YoutubePlayerController(
+                        initialVideoId: _extractedVideoId!,
+                        flags: const YoutubePlayerFlags(
+                          autoPlay: false,
+                          mute: false,
+                          isLive: false,
+                          forceHD: true,
+                          enableCaption: true,
+                        ),
+                      ),
+                      showVideoProgressIndicator: true,
+                      progressIndicatorColor: Colors.green,
+                      onReady: () {
+                        // Video is ready to play
+                      },
+                      onEnded: (data) {
+                        // Video ended
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ==================== Hierarchy Helper Methods ====================
+
+  String _getSectionNameAr(String section) {
+    final sectionNames = {
+      'fiqh': 'الفقه',
+      'hadith': 'الحديث',
+      'seerah': 'السيرة',
+      'tafsir': 'التفسير',
+    };
+    return sectionNames[section] ?? section;
+  }
+
+  void _loadCategories(String section) {
+    final hierarchyProvider = Provider.of<HierarchyProvider>(
+      context,
+      listen: false,
+    );
+    hierarchyProvider.loadCategoriesBySection(section);
+  }
+
+  void _loadSubcategories(String categoryId) {
+    final hierarchyProvider = Provider.of<HierarchyProvider>(
+      context,
+      listen: false,
+    );
+    hierarchyProvider.loadSubcategoriesByCategory(categoryId);
+  }
+
   Future<void> _saveLecture() async {
     if (_formKey.currentState?.validate() != true) {
+      return;
+    }
+
+    // Get selected section from provider
+    final hierarchyProvider = Provider.of<HierarchyProvider>(
+      context,
+      listen: false,
+    );
+    final selectedSection = hierarchyProvider.selectedSection;
+
+    // Validate hierarchy selection
+    if (selectedSection == null || _selectedCategoryId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يرجى اختيار القسم والفئة'),
+          backgroundColor: Colors.red,
+        ),
+      );
       return;
     }
 
@@ -521,6 +911,22 @@ class _AddLectureFormState extends State<AddLectureForm> {
       }
     }
 
+    // Validate YouTube URL if provided
+    if (_videoUrlController.text.isNotEmpty) {
+      final result = YouTubeUtils.validateAndExtract(
+        _videoUrlController.text.trim(),
+      );
+      if (!result['isValid']) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'رابط يوتيوب غير صحيح'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+
     // Prepare media data with URL validation
     Map<String, dynamic>? media;
     if (_audioUrlController.text.isNotEmpty ||
@@ -541,16 +947,11 @@ class _AddLectureFormState extends State<AddLectureForm> {
       }
       if (_videoUrlController.text.isNotEmpty) {
         final videoUrl = _videoUrlController.text.trim();
-        if (!_isValidUrl(videoUrl)) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('صيغة رابط الفيديو غير صحيحة'),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
-        }
+        final videoId = YouTubeUtils.extractVideoId(videoUrl);
         media['videoUrl'] = videoUrl;
+        if (videoId != null) {
+          media['videoId'] = videoId;
+        }
       }
     }
 
@@ -563,8 +964,11 @@ class _AddLectureFormState extends State<AddLectureForm> {
     final success = await lectureProvider.addSheikhLecture(
       sheikhId: authProvider.currentUid ?? '',
       sheikhName: authProvider.currentUser?['name'] ?? 'شيخ',
-      categoryKey: widget.categoryKey,
-      categoryNameAr: widget.categoryNameAr,
+      section: selectedSection!,
+      categoryId: _selectedCategoryId!,
+      categoryName: _selectedCategoryName!,
+      subcategoryId: _selectedSubcategoryId,
+      subcategoryName: _selectedSubcategoryName,
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim().isEmpty
           ? null

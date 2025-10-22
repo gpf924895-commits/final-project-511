@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:new_project/screens/sheikh/add_lecture_form.dart';
+import 'package:new_project/provider/hierarchy_provider.dart';
 import 'package:new_project/widgets/sheikh_guard.dart';
 
 class SheikhCategoryPicker extends StatelessWidget {
@@ -121,14 +123,23 @@ class SheikhCategoryPicker extends StatelessWidget {
     String description,
   ) {
     return ElevatedButton.icon(
-      onPressed: () {
-        Navigator.push(
+      onPressed: () async {
+        // Set the selected section in the provider
+        await Provider.of<HierarchyProvider>(
           context,
-          MaterialPageRoute(
-            builder: (context) =>
-                AddLectureForm(categoryKey: categoryKey, categoryNameAr: title),
-          ),
-        );
+          listen: false,
+        ).setSelectedSection(categoryKey);
+
+        // Check if we can pop (opened from AddLectureForm)
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context, true);
+        } else {
+          // Navigate to AddLectureForm (opened directly)
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const AddLectureForm()),
+          );
+        }
       },
       icon: Icon(icon, size: 24),
       label: Column(

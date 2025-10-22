@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:new_project/provider/subcategory_provider.dart';
-import 'package:new_project/screens/subcategory_sheikhs_page.dart';
+import 'package:new_project/provider/hierarchy_provider.dart';
+import 'package:new_project/screens/category_subcategories_page.dart';
 import '../widgets/app_drawer.dart';
 
 class SeerahSectionPage extends StatefulWidget {
   final bool isDarkMode;
   final Function(bool)? toggleTheme;
-  const SeerahSectionPage({super.key, required this.isDarkMode, this.toggleTheme});
+  const SeerahSectionPage({
+    super.key,
+    required this.isDarkMode,
+    this.toggleTheme,
+  });
 
   @override
   State<SeerahSectionPage> createState() => _SeerahSectionPageState();
@@ -17,17 +21,21 @@ class _SeerahSectionPageState extends State<SeerahSectionPage> {
   @override
   void initState() {
     super.initState();
-    // Load subcategories when page opens
+    // Set the selected section and load categories
     Future.microtask(() {
-      Provider.of<SubcategoryProvider>(context, listen: false)
-          .loadSubcategoriesBySection('السيرة');
+      Provider.of<HierarchyProvider>(
+        context,
+        listen: false,
+      ).setSelectedSection('seerah');
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: widget.isDarkMode ? const Color(0xFF121212) : const Color(0xFFE4E5D3),
+      backgroundColor: widget.isDarkMode
+          ? const Color(0xFF121212)
+          : const Color(0xFFE4E5D3),
       appBar: AppBar(
         title: const Text('قسم السيرة'),
         centerTitle: true,
@@ -40,8 +48,10 @@ class _SeerahSectionPageState extends State<SeerahSectionPage> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              Provider.of<SubcategoryProvider>(context, listen: false)
-                  .loadSubcategoriesBySection('السيرة');
+              Provider.of<HierarchyProvider>(
+                context,
+                listen: false,
+              ).setSelectedSection('seerah');
             },
           ),
           if (widget.toggleTheme != null)
@@ -53,16 +63,52 @@ class _SeerahSectionPageState extends State<SeerahSectionPage> {
             ),
         ],
       ),
-      drawer: widget.toggleTheme != null ? AppDrawer(toggleTheme: widget.toggleTheme!) : null,
-      body: Consumer<SubcategoryProvider>(
-        builder: (context, subcategoryProvider, child) {
-          if (subcategoryProvider.isLoading) {
+      drawer: widget.toggleTheme != null
+          ? AppDrawer(toggleTheme: widget.toggleTheme!)
+          : null,
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: Provider.of<HierarchyProvider>(
+          context,
+          listen: false,
+        ).getCategoriesStream('seerah'),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final subcategories = subcategoryProvider.getSubcategoriesBySection('السيرة');
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 80, color: Colors.red[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'خطأ في تحميل الفئات',
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    snapshot.error.toString(),
+                    style: TextStyle(fontSize: 14, color: Colors.red[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {});
+                    },
+                    child: const Text('إعادة المحاولة'),
+                  ),
+                ],
+              ),
+            );
+          }
 
-          if (subcategories.isEmpty) {
+          final categories = snapshot.data ?? [];
+
+          if (categories.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -70,8 +116,13 @@ class _SeerahSectionPageState extends State<SeerahSectionPage> {
                   Icon(Icons.category, size: 80, color: Colors.grey[400]),
                   const SizedBox(height: 16),
                   Text(
-                    'لا توجد فئات فرعية في قسم السيرة',
+                    'لا توجد فئات في قسم السيرة',
                     style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'سيتم عرض الفئات هنا عند إضافتها',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                   ),
                 ],
               ),
@@ -81,52 +132,58 @@ class _SeerahSectionPageState extends State<SeerahSectionPage> {
           return Padding(
             padding: const EdgeInsets.all(16.0),
             child: ListView.builder(
-              itemCount: subcategories.length,
+              itemCount: categories.length,
               itemBuilder: (context, index) {
-                final subcategory = subcategories[index];
+                final category = categories[index];
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  color: widget.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+                  color: widget.isDarkMode
+                      ? const Color(0xFF1E1E1E)
+                      : Colors.white,
                   child: ListTile(
                     contentPadding: const EdgeInsets.all(16),
                     leading: CircleAvatar(
                       backgroundColor: Colors.green,
                       radius: 30,
-                      child: Icon(
-                        _getIconForSubcategory(subcategory['icon_name']),
+                      child: const Icon(
+                        Icons.category,
                         color: Colors.white,
                         size: 30,
                       ),
                     ),
                     title: Text(
-                      subcategory['name'],
+                      category['name'] ?? 'بدون اسم',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    subtitle: subcategory['description'] != null
+                    subtitle: category['description'] != null
                         ? Padding(
                             padding: const EdgeInsets.only(top: 8.0),
                             child: Text(
-                              subcategory['description'],
+                              category['description'],
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
                           )
                         : null,
-                    trailing: const Icon(Icons.arrow_forward_ios, color: Colors.green),
+                    trailing: const Icon(
+                      Icons.arrow_forward_ios,
+                      color: Colors.green,
+                    ),
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => SubcategorySheikhsPage(
-                            subcategoryId: subcategory['id'],
-                            subcategoryName: subcategory['name'],
-                            section: 'السيرة',
+                          builder: (context) => CategorySubcategoriesPage(
+                            section: 'seerah',
+                            sectionNameAr: 'السيرة',
+                            categoryId: category['id'],
+                            categoryName: category['name'],
                             isDarkMode: widget.isDarkMode,
                             toggleTheme: widget.toggleTheme,
                           ),
@@ -144,11 +201,19 @@ class _SeerahSectionPageState extends State<SeerahSectionPage> {
         currentIndex: 1,
         selectedItemColor: Colors.green,
         unselectedItemColor: Colors.grey,
-        backgroundColor: widget.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        backgroundColor: widget.isDarkMode
+            ? const Color(0xFF1E1E1E)
+            : Colors.white,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'الإشعارات'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications),
+            label: 'الإشعارات',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'الإعدادات'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'الإعدادات',
+          ),
         ],
         onTap: (index) {
           if (index == 1) {

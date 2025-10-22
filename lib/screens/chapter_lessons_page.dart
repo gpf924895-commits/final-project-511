@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:new_project/provider/pro_login.dart';
 import 'package:new_project/services/subcategory_service.dart';
 import 'package:new_project/utils/auth_guard.dart';
+import 'package:new_project/utils/youtube_utils.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/app_drawer.dart';
 
 class ChapterLessonsPage extends StatefulWidget {
@@ -35,57 +38,30 @@ class ChapterLessonsPage extends StatefulWidget {
 
 class _ChapterLessonsPageState extends State<ChapterLessonsPage> {
   final SubcategoryService _service = SubcategoryService();
-  List<Map<String, dynamic>> _lessons = [];
-  bool _isLoading = true;
-  String? _errorMessage;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => _loadLessons());
+    // No need to call _loadLessons() as we'll use StreamBuilder
   }
 
-  Future<void> _loadLessons() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final lessons = await _service.listLessons(
-        widget.subcategoryId,
-        widget.sheikhUid,
-        widget.chapterId,
-      );
-      setState(() {
-        _lessons = lessons;
-        _isLoading = false;
-      });
-    } on SubcategoryServiceException catch (e) {
-      setState(() {
-        _errorMessage = e.message;
-        _isLoading = false;
-      });
-
-      if (e.needsIndex && e.indexUrl != null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text(
-                'يرجى إنشاء الفهرس المطلوب في قاعدة البيانات. راجع وحدة التحكم للحصول على الرابط.',
-              ),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 5),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
-    }
+  // Get real-time stream of Sheikh lectures
+  Stream<List<Map<String, dynamic>>> _getSheikhLecturesStream() {
+    return _firestore
+        .collection('lectures')
+        .where('sheikhId', isEqualTo: widget.sheikhUid)
+        .where('isPublished', isEqualTo: true)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+          print('[ChapterLessonsPage] Snapshot size: ${snapshot.docs.length}');
+          return snapshot.docs.map((doc) {
+            final data = doc.data();
+            data['id'] = doc.id;
+            return data;
+          }).toList();
+        });
   }
 
   Future<void> _addLesson() async {
@@ -116,9 +92,7 @@ class _ChapterLessonsPageState extends State<ChapterLessonsPage> {
     final descriptionController = TextEditingController();
     final mediaUrlController = TextEditingController();
     final durationController = TextEditingController();
-    final orderController = TextEditingController(
-      text: (_lessons.length + 1).toString(),
-    );
+    final orderController = TextEditingController(text: '1');
 
     final result = await showDialog<bool>(
       context: context,
@@ -152,8 +126,10 @@ class _ChapterLessonsPageState extends State<ChapterLessonsPage> {
                 TextField(
                   controller: mediaUrlController,
                   decoration: const InputDecoration(
-                    labelText: 'رابط الوسائط (اختياري)',
+                    labelText: 'رابط الفيديو (يوتيوب)',
+                    hintText: 'أدخل رابط فيديو يوتيوب',
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.videocam),
                   ),
                   textAlign: TextAlign.right,
                 ),
@@ -211,22 +187,34 @@ class _ChapterLessonsPageState extends State<ChapterLessonsPage> {
     }
 
     try {
+      // Prepare lesson data
+      Map<String, dynamic> lessonData = {
+        'title': titleController.text.trim(),
+        'description': descriptionController.text.trim(),
+        'duration': durationController.text.trim().isEmpty
+            ? null
+            : int.tryParse(durationController.text),
+        'order': int.tryParse(orderController.text) ?? 0,
+      };
+
+      // Handle media URL and extract videoId if it's a YouTube URL
+      final mediaUrl = mediaUrlController.text.trim();
+      if (mediaUrl.isNotEmpty) {
+        lessonData['mediaUrl'] = mediaUrl;
+
+        // Extract videoId for YouTube URLs
+        final videoId = YouTubeUtils.extractVideoId(mediaUrl);
+        if (videoId != null) {
+          lessonData['videoId'] = videoId;
+        }
+      }
+
       await _service.createLesson(
         widget.subcategoryId,
         widget.sheikhUid,
         widget.chapterId,
         authProvider.currentUid ?? '',
-        {
-          'title': titleController.text.trim(),
-          'description': descriptionController.text.trim(),
-          'mediaUrl': mediaUrlController.text.trim().isEmpty
-              ? null
-              : mediaUrlController.text.trim(),
-          'duration': durationController.text.trim().isEmpty
-              ? null
-              : int.tryParse(durationController.text),
-          'order': int.tryParse(orderController.text) ?? 0,
-        },
+        lessonData,
       );
 
       if (mounted) {
@@ -236,7 +224,7 @@ class _ChapterLessonsPageState extends State<ChapterLessonsPage> {
             backgroundColor: Colors.green,
           ),
         );
-        _loadLessons();
+        // StreamBuilder will automatically refresh
       }
     } catch (e) {
       if (mounted) {
@@ -247,73 +235,80 @@ class _ChapterLessonsPageState extends State<ChapterLessonsPage> {
     }
   }
 
-  void _showLessonDetails(Map<String, dynamic> lesson) {
-    showDialog(
-      context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: Text(lesson['title'] ?? ''),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (lesson['description'] != null &&
-                    lesson['description'].toString().isNotEmpty) ...[
-                  const Text(
-                    'الوصف:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(lesson['description']),
-                  const SizedBox(height: 16),
-                ],
-                if (lesson['duration'] != null) ...[
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.access_time,
-                        size: 16,
-                        color: Colors.green,
-                      ),
-                      const SizedBox(width: 8),
-                      Text('المدة: ${lesson['duration']} دقيقة'),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                if (lesson['mediaUrl'] != null) ...[
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.video_library,
-                        size: 16,
-                        color: Colors.green,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'يحتوي على وسائط',
-                        style: TextStyle(
-                          color: Colors.green,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('إغلاق'),
+  Widget _buildVideoPlayer(Map<String, dynamic> lesson) {
+    final mediaUrl = lesson['mediaUrl'] as String?;
+    if (mediaUrl == null || mediaUrl.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Try to get videoId from lesson data first, then extract from URL
+    String? videoId = lesson['videoId'] as String?;
+    if (videoId == null || videoId.isEmpty) {
+      videoId = YouTubeUtils.extractVideoId(mediaUrl);
+    }
+
+    if (videoId == null) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.orange[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.orange[200] ?? Colors.orange),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange[600], size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'رابط الفيديو غير مدعوم أو غير صحيح',
+                style: TextStyle(color: Colors.orange[700]),
+              ),
             ),
           ],
         ),
-      ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'الفيديو:',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 200,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey[300] ?? Colors.grey),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: YoutubePlayer(
+              controller: YoutubePlayerController(
+                initialVideoId: videoId,
+                flags: const YoutubePlayerFlags(
+                  autoPlay: false,
+                  mute: false,
+                  isLive: false,
+                  forceHD: true,
+                  enableCaption: true,
+                ),
+              ),
+              showVideoProgressIndicator: true,
+              progressIndicatorColor: Colors.green,
+              onReady: () {
+                // Video is ready to play
+              },
+              onEnded: (data) {
+                // Video ended
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -339,10 +334,6 @@ class _ChapterLessonsPageState extends State<ChapterLessonsPage> {
             onPressed: () => Navigator.pop(context),
           ),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _loadLessons,
-            ),
             if (widget.toggleTheme != null)
               Builder(
                 builder: (context) => IconButton(
@@ -355,38 +346,64 @@ class _ChapterLessonsPageState extends State<ChapterLessonsPage> {
         drawer: widget.toggleTheme != null
             ? AppDrawer(toggleTheme: widget.toggleTheme!)
             : null,
-        body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage != null
-            ? Center(
+        body: StreamBuilder<List<Map<String, dynamic>>>(
+          stream: _getSheikhLecturesStream(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (snapshot.hasError) {
+              return Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.error_outline, size: 80, color: Colors.red[400]),
                     const SizedBox(height: 16),
                     Text(
-                      _errorMessage!,
+                      'خطأ في تحميل المحاضرات',
                       style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      snapshot.error.toString(),
+                      style: TextStyle(fontSize: 14, color: Colors.red[600]),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: _loadLessons,
+                      onPressed: () {
+                        setState(() {});
+                      },
                       child: const Text('إعادة المحاولة'),
                     ),
                   ],
                 ),
-              )
-            : _lessons.isEmpty
-            ? Center(
+              );
+            }
+
+            final lectures = snapshot.data ?? [];
+
+            if (lectures.isEmpty) {
+              return Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.play_lesson, size: 80, color: Colors.grey[400]),
+                    Icon(
+                      Icons.video_library_outlined,
+                      size: 80,
+                      color: Colors.grey[400],
+                    ),
                     const SizedBox(height: 16),
                     Text(
-                      'لا توجد دروس بعد',
+                      'لا توجد محاضرات متاحة',
                       style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'سيتم عرض المحاضرات هنا عند إضافتها',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                     ),
                     if (canEdit) ...[
                       const SizedBox(height: 16),
@@ -402,88 +419,38 @@ class _ChapterLessonsPageState extends State<ChapterLessonsPage> {
                     ],
                   ],
                 ),
-              )
-            : Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'دروس ${widget.chapterTitle}',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green,
-                      ),
+              );
+            }
+
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'محاضرات ${widget.chapterTitle}',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
                     ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: _lessons.length,
-                        itemBuilder: (context, index) {
-                          final lesson = _lessons[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            color: widget.isDarkMode
-                                ? const Color(0xFF1E1E1E)
-                                : Colors.white,
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.all(16),
-                              leading: CircleAvatar(
-                                backgroundColor: Colors.green,
-                                radius: 24,
-                                child: Text(
-                                  '${lesson['order'] ?? index + 1}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              title: Text(
-                                lesson['title'] ?? '',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              subtitle:
-                                  lesson['description'] != null &&
-                                      lesson['description']
-                                          .toString()
-                                          .isNotEmpty
-                                  ? Padding(
-                                      padding: const EdgeInsets.only(top: 8.0),
-                                      child: Text(
-                                        lesson['description'],
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    )
-                                  : null,
-                              trailing: lesson['mediaUrl'] != null
-                                  ? const Icon(
-                                      Icons.video_library,
-                                      color: Colors.green,
-                                    )
-                                  : const Icon(
-                                      Icons.arrow_forward_ios,
-                                      color: Colors.green,
-                                    ),
-                              onTap: () => _showLessonDetails(lesson),
-                            ),
-                          );
-                        },
-                      ),
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: lectures.length,
+                      itemBuilder: (context, index) {
+                        final lecture = lectures[index];
+                        return _buildLectureCard(lecture, canEdit);
+                      },
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-        floatingActionButton: canEdit && _lessons.isNotEmpty
+            );
+          },
+        ),
+        floatingActionButton: canEdit
             ? FloatingActionButton.extended(
                 onPressed: _addLesson,
                 icon: const Icon(Icons.add),
@@ -493,5 +460,219 @@ class _ChapterLessonsPageState extends State<ChapterLessonsPage> {
             : null,
       ),
     );
+  }
+
+  // Build lecture card for Sheikh lectures
+  Widget _buildLectureCard(Map<String, dynamic> lecture, bool canEdit) {
+    final mediaUrl = lecture['media']?['videoUrl'] ?? '';
+    final hasVideo =
+        mediaUrl.isNotEmpty && YouTubeUtils.extractVideoId(mediaUrl) != null;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: widget.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: CircleAvatar(
+          backgroundColor: Colors.green,
+          radius: 24,
+          child: const Icon(Icons.video_library, color: Colors.white, size: 20),
+        ),
+        title: Text(
+          lecture['title'] ?? 'بدون عنوان',
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (lecture['description'] != null &&
+                lecture['description'].toString().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  lecture['description'],
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                ),
+              ),
+            if (lecture['startTime'] != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Text(
+                  'وقت البداية: ${_formatDateTime(lecture['startTime'])}',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                ),
+              ),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (hasVideo)
+              const Icon(Icons.play_circle_filled, color: Colors.red, size: 24)
+            else
+              const Icon(Icons.video_library, color: Colors.green, size: 24),
+            const SizedBox(width: 8),
+            const Icon(Icons.arrow_forward_ios, color: Colors.green, size: 16),
+          ],
+        ),
+        onTap: () => _showLectureDetails(lecture),
+      ),
+    );
+  }
+
+  // Show lecture details with video player
+  void _showLectureDetails(Map<String, dynamic> lecture) {
+    showDialog(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Dialog(
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.95,
+            height: MediaQuery.of(context).size.height * 0.8,
+            child: Column(
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Colors.green,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      topRight: Radius.circular(12),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          lecture['title'] ?? 'بدون عنوان',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+                // Content
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (lecture['description'] != null &&
+                            lecture['description'].toString().isNotEmpty) ...[
+                          const Text(
+                            'الوصف:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            lecture['description'],
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        if (lecture['startTime'] != null) ...[
+                          const Text(
+                            'وقت البداية:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _formatDateTime(lecture['startTime']),
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        if (lecture['endTime'] != null) ...[
+                          const Text(
+                            'وقت النهاية:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _formatDateTime(lecture['endTime']),
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        if (lecture['location'] != null) ...[
+                          const Text(
+                            'الموقع:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            lecture['location']['label'] ?? 'غير محدد',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        // Video player
+                        if (lecture['media']?['videoUrl'] != null) ...[
+                          const Text(
+                            'الفيديو:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          _buildVideoPlayer(lecture),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Format DateTime for display
+  String _formatDateTime(dynamic timestamp) {
+    if (timestamp == null) return 'غير محدد';
+
+    try {
+      DateTime dateTime;
+      if (timestamp is Timestamp) {
+        dateTime = timestamp.toDate();
+      } else if (timestamp is DateTime) {
+        dateTime = timestamp;
+      } else {
+        return 'غير محدد';
+      }
+
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year} - ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return 'غير محدد';
+    }
   }
 }

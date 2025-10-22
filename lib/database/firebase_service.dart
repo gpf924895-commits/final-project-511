@@ -590,12 +590,15 @@ class FirebaseService {
 
   // ==================== Sheikh Lecture Management ====================
 
-  // Add lecture for Sheikh (with new data model)
+  // Add lecture for Sheikh (with hierarchy support)
   Future<Map<String, dynamic>> addSheikhLecture({
     required String sheikhId,
     required String sheikhName,
-    required String categoryKey,
-    required String categoryNameAr,
+    required String section,
+    required String categoryId,
+    required String categoryName,
+    String? subcategoryId,
+    String? subcategoryName,
     required String title,
     String? description,
     required Timestamp startTime,
@@ -607,17 +610,22 @@ class FirebaseService {
       final docRef = await lecturesCollection.add({
         'sheikhId': sheikhId,
         'sheikhName': sheikhName,
-        'categoryKey': categoryKey,
-        'categoryNameAr': categoryNameAr,
+        'section': section,
+        'categoryId': categoryId,
+        'categoryName': categoryName,
+        'subcategoryId': subcategoryId,
+        'subcategoryName': subcategoryName,
         'title': title,
         'description': description,
         'startTime': startTime,
         'endTime': endTime,
         'location': location,
         'status': 'draft',
+        'isPublished': false,
         'media': media,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
+        'createdBy': sheikhId,
       });
 
       return {

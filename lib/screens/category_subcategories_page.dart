@@ -1,32 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:new_project/provider/hierarchy_provider.dart';
-import 'package:new_project/screens/category_subcategories_page.dart';
+import 'package:new_project/screens/lectures_list_page.dart';
 import '../widgets/app_drawer.dart';
 
-class FiqhSectionPage extends StatefulWidget {
+class CategorySubcategoriesPage extends StatefulWidget {
+  final String section;
+  final String sectionNameAr;
+  final String categoryId;
+  final String categoryName;
   final bool isDarkMode;
   final Function(bool)? toggleTheme;
-  const FiqhSectionPage({
+
+  const CategorySubcategoriesPage({
     super.key,
+    required this.section,
+    required this.sectionNameAr,
+    required this.categoryId,
+    required this.categoryName,
     required this.isDarkMode,
     this.toggleTheme,
   });
 
   @override
-  State<FiqhSectionPage> createState() => _FiqhSectionPageState();
+  State<CategorySubcategoriesPage> createState() =>
+      _CategorySubcategoriesPageState();
 }
 
-class _FiqhSectionPageState extends State<FiqhSectionPage> {
+class _CategorySubcategoriesPageState extends State<CategorySubcategoriesPage> {
   @override
   void initState() {
     super.initState();
-    // Set the selected section and load categories
+    // Load subcategories when page opens
     Future.microtask(() {
       Provider.of<HierarchyProvider>(
         context,
         listen: false,
-      ).setSelectedSection('fiqh');
+      ).loadSubcategoriesByCategory(widget.categoryId);
     });
   }
 
@@ -37,7 +47,7 @@ class _FiqhSectionPageState extends State<FiqhSectionPage> {
           ? const Color(0xFF121212)
           : const Color(0xFFE4E5D3),
       appBar: AppBar(
-        title: const Text('قسم الفقه'),
+        title: Text(widget.categoryName),
         centerTitle: true,
         backgroundColor: Colors.green,
         leading: IconButton(
@@ -51,7 +61,7 @@ class _FiqhSectionPageState extends State<FiqhSectionPage> {
               Provider.of<HierarchyProvider>(
                 context,
                 listen: false,
-              ).setSelectedSection('fiqh');
+              ).loadSubcategoriesByCategory(widget.categoryId);
             },
           ),
           if (widget.toggleTheme != null)
@@ -66,17 +76,13 @@ class _FiqhSectionPageState extends State<FiqhSectionPage> {
       drawer: widget.toggleTheme != null
           ? AppDrawer(toggleTheme: widget.toggleTheme!)
           : null,
-      body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: Provider.of<HierarchyProvider>(
-          context,
-          listen: false,
-        ).getCategoriesStream('fiqh'),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+      body: Consumer<HierarchyProvider>(
+        builder: (context, hierarchyProvider, child) {
+          if (hierarchyProvider.isLoading) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (snapshot.hasError) {
+          if (hierarchyProvider.errorMessage != null) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -84,20 +90,17 @@ class _FiqhSectionPageState extends State<FiqhSectionPage> {
                   Icon(Icons.error_outline, size: 80, color: Colors.red[400]),
                   const SizedBox(height: 16),
                   Text(
-                    'خطأ في تحميل الفئات',
+                    hierarchyProvider.errorMessage!,
                     style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    snapshot.error.toString(),
-                    style: TextStyle(fontSize: 14, color: Colors.red[600]),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () {
-                      setState(() {});
+                      Provider.of<HierarchyProvider>(
+                        context,
+                        listen: false,
+                      ).loadSubcategoriesByCategory(widget.categoryId);
                     },
                     child: const Text('إعادة المحاولة'),
                   ),
@@ -106,23 +109,51 @@ class _FiqhSectionPageState extends State<FiqhSectionPage> {
             );
           }
 
-          final categories = snapshot.data ?? [];
+          final subcategories = hierarchyProvider.subcategories;
 
-          if (categories.isEmpty) {
+          if (subcategories.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.category, size: 80, color: Colors.grey[400]),
+                  Icon(
+                    Icons.subdirectory_arrow_right,
+                    size: 80,
+                    color: Colors.grey[400],
+                  ),
                   const SizedBox(height: 16),
                   Text(
-                    'لا توجد فئات في قسم الفقه',
+                    'لا توجد فئات فرعية في هذه الفئة',
                     style: TextStyle(fontSize: 18, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'سيتم عرض الفئات هنا عند إضافتها',
+                    'سيتم عرض الفئات الفرعية هنا عند إضافتها',
                     style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => LecturesListPage(
+                            section: widget.section,
+                            sectionNameAr: widget.sectionNameAr,
+                            categoryId: widget.categoryId,
+                            categoryName: widget.categoryName,
+                            isDarkMode: widget.isDarkMode,
+                            toggleTheme: widget.toggleTheme,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.video_library),
+                    label: const Text('عرض المحاضرات مباشرة'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
                   ),
                 ],
               ),
@@ -132,9 +163,9 @@ class _FiqhSectionPageState extends State<FiqhSectionPage> {
           return Padding(
             padding: const EdgeInsets.all(16.0),
             child: ListView.builder(
-              itemCount: categories.length,
+              itemCount: subcategories.length,
               itemBuilder: (context, index) {
-                final category = categories[index];
+                final subcategory = subcategories[index];
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   shape: RoundedRectangleBorder(
@@ -146,26 +177,26 @@ class _FiqhSectionPageState extends State<FiqhSectionPage> {
                   child: ListTile(
                     contentPadding: const EdgeInsets.all(16),
                     leading: CircleAvatar(
-                      backgroundColor: Colors.green,
+                      backgroundColor: Colors.blue,
                       radius: 30,
                       child: const Icon(
-                        Icons.category,
+                        Icons.subdirectory_arrow_right,
                         color: Colors.white,
                         size: 30,
                       ),
                     ),
                     title: Text(
-                      category['name'] ?? 'بدون اسم',
+                      subcategory['name'] ?? 'بدون اسم',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    subtitle: category['description'] != null
+                    subtitle: subcategory['description'] != null
                         ? Padding(
                             padding: const EdgeInsets.only(top: 8.0),
                             child: Text(
-                              category['description'],
+                              subcategory['description'],
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -179,11 +210,13 @@ class _FiqhSectionPageState extends State<FiqhSectionPage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => CategorySubcategoriesPage(
-                            section: 'fiqh',
-                            sectionNameAr: 'الفقه',
-                            categoryId: category['id'],
-                            categoryName: category['name'],
+                          builder: (context) => LecturesListPage(
+                            section: widget.section,
+                            sectionNameAr: widget.sectionNameAr,
+                            categoryId: widget.categoryId,
+                            categoryName: widget.categoryName,
+                            subcategoryId: subcategory['id'],
+                            subcategoryName: subcategory['name'],
                             isDarkMode: widget.isDarkMode,
                             toggleTheme: widget.toggleTheme,
                           ),
@@ -222,34 +255,5 @@ class _FiqhSectionPageState extends State<FiqhSectionPage> {
         },
       ),
     );
-  }
-
-  IconData _getIconForSubcategory(String? iconName) {
-    switch (iconName) {
-      case 'mosque':
-        return Icons.mosque;
-      case 'handshake':
-        return Icons.handshake;
-      case 'family':
-        return Icons.family_restroom;
-      case 'book':
-        return Icons.menu_book;
-      case 'books':
-        return Icons.library_books;
-      case 'list':
-        return Icons.format_list_numbered;
-      case 'quran':
-        return Icons.menu_book;
-      case 'history':
-        return Icons.history_edu;
-      case 'school':
-        return Icons.school;
-      case 'location':
-        return Icons.location_on;
-      case 'flag':
-        return Icons.flag;
-      default:
-        return Icons.category;
-    }
   }
 }

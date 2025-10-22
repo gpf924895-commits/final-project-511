@@ -19,6 +19,7 @@ import 'package:new_project/provider/subcategory_provider.dart';
 import 'package:new_project/provider/prayer_times_provider.dart';
 import 'package:new_project/provider/sheikh_provider.dart';
 import 'package:new_project/provider/chapter_provider.dart';
+import 'package:new_project/provider/hierarchy_provider.dart';
 import 'package:new_project/database/firebase_service.dart';
 
 void main() async {
@@ -45,6 +46,7 @@ void main() async {
         ChangeNotifierProvider(create: (context) => PrayerTimesProvider()),
         ChangeNotifierProvider(create: (context) => SheikhProvider()),
         ChangeNotifierProvider(create: (context) => ChapterProvider()),
+        ChangeNotifierProvider(create: (context) => HierarchyProvider()),
       ],
       child: const MyApp(),
     ),
@@ -162,7 +164,8 @@ class _MyAppState extends State<MyApp> {
         '/main': (context) => HomePage(toggleTheme: (isDark) {}),
         '/admin/login': (context) => const AdminLoginScreen(),
         '/admin/test': (context) => const AdminTestScreen(),
-        '/admin/add-sheikh': (context) => const AdminGuard(child: AdminAddSheikhPage()),
+        '/admin/add-sheikh': (context) =>
+            const AdminGuard(child: AdminAddSheikhPage()),
         '/sheikh/home': (context) => const SheikhGuard(child: SheikhHomePage()),
         '/admin/home': (context) => const AdminGuard(child: AdminPanelPage()),
         '/supervisor/home': (context) =>

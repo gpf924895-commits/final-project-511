@@ -1,33 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
 import 'package:new_project/screens/sheikh/sheikh_category_picker.dart';
 import 'package:new_project/screens/sheikh/add_lecture_form.dart';
-import 'package:new_project/provider/pro_login.dart';
-import 'package:new_project/provider/lecture_provider.dart';
+import 'test_helpers.dart';
 
 void main() {
   group('Sheikh Add Flow Tests', () {
     late MockAuthProvider mockAuthProvider;
     late MockLectureProvider mockLectureProvider;
+    late MockHierarchyProvider mockHierarchyProvider;
 
     setUp(() {
       mockAuthProvider = MockAuthProvider();
       mockLectureProvider = MockLectureProvider();
+      mockHierarchyProvider = MockHierarchyProvider();
     });
 
     testWidgets('Category Picker displays all four categories', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(
-        MultiProvider(
-          providers: [
-            ChangeNotifierProvider<AuthProvider>.value(value: mockAuthProvider),
-            ChangeNotifierProvider<LectureProvider>.value(
-              value: mockLectureProvider,
-            ),
-          ],
-          child: const MaterialApp(home: SheikhCategoryPicker()),
+        createTestWidgetWithProviders(
+          const SheikhCategoryPicker(),
+          authProvider: mockAuthProvider,
+          lectureProvider: mockLectureProvider,
+          hierarchyProvider: mockHierarchyProvider,
         ),
       );
 
@@ -50,14 +47,11 @@ void main() {
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(
-        MultiProvider(
-          providers: [
-            ChangeNotifierProvider<AuthProvider>.value(value: mockAuthProvider),
-            ChangeNotifierProvider<LectureProvider>.value(
-              value: mockLectureProvider,
-            ),
-          ],
-          child: const MaterialApp(home: SheikhCategoryPicker()),
+        createTestWidgetWithProviders(
+          const SheikhCategoryPicker(),
+          authProvider: mockAuthProvider,
+          lectureProvider: mockLectureProvider,
+          hierarchyProvider: mockHierarchyProvider,
         ),
       );
 
@@ -75,40 +69,29 @@ void main() {
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(
-        MultiProvider(
-          providers: [
-            ChangeNotifierProvider<AuthProvider>.value(value: mockAuthProvider),
-            ChangeNotifierProvider<LectureProvider>.value(
-              value: mockLectureProvider,
-            ),
-          ],
-          child: const MaterialApp(
-            home: AddLectureForm(categoryKey: 'fiqh', categoryNameAr: 'الفقه'),
-          ),
+        createTestWidgetWithProviders(
+          const AddLectureForm(),
+          authProvider: mockAuthProvider,
+          lectureProvider: mockLectureProvider,
+          hierarchyProvider: mockHierarchyProvider,
         ),
       );
 
       await tester.pumpAndSettle();
 
-      // Verify category is prefilled
-      expect(find.text('إضافة محاضرة - الفقه'), findsOneWidget);
-      expect(find.text('الفقه'), findsOneWidget);
+      // Verify form is displayed
+      expect(find.text('إضافة محاضرة'), findsOneWidget);
     });
 
     testWidgets('Add Lecture Form validates required fields', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(
-        MultiProvider(
-          providers: [
-            ChangeNotifierProvider<AuthProvider>.value(value: mockAuthProvider),
-            ChangeNotifierProvider<LectureProvider>.value(
-              value: mockLectureProvider,
-            ),
-          ],
-          child: const MaterialApp(
-            home: AddLectureForm(categoryKey: 'fiqh', categoryNameAr: 'الفقه'),
-          ),
+        createTestWidgetWithProviders(
+          const AddLectureForm(),
+          authProvider: mockAuthProvider,
+          lectureProvider: mockLectureProvider,
+          hierarchyProvider: mockHierarchyProvider,
         ),
       );
 
@@ -119,23 +102,18 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify validation messages appear
-      expect(find.text('يرجى تحديد وقت البداية'), findsOneWidget);
+      expect(find.text('يرجى اختيار القسم والفئة'), findsOneWidget);
     });
 
     testWidgets('Add Lecture Form validates future start time', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(
-        MultiProvider(
-          providers: [
-            ChangeNotifierProvider<AuthProvider>.value(value: mockAuthProvider),
-            ChangeNotifierProvider<LectureProvider>.value(
-              value: mockLectureProvider,
-            ),
-          ],
-          child: const MaterialApp(
-            home: AddLectureForm(categoryKey: 'fiqh', categoryNameAr: 'الفقه'),
-          ),
+        createTestWidgetWithProviders(
+          const AddLectureForm(),
+          authProvider: mockAuthProvider,
+          lectureProvider: mockLectureProvider,
+          hierarchyProvider: mockHierarchyProvider,
         ),
       );
 
@@ -148,12 +126,7 @@ void main() {
       );
 
       // Set past date and time
-      await tester.tap(find.text('اختيار التاريخ'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('اختيار الوقت'));
+      await tester.tap(find.text('اختر وقت البداية'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('OK'));
       await tester.pumpAndSettle();
@@ -170,16 +143,11 @@ void main() {
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(
-        MultiProvider(
-          providers: [
-            ChangeNotifierProvider<AuthProvider>.value(value: mockAuthProvider),
-            ChangeNotifierProvider<LectureProvider>.value(
-              value: mockLectureProvider,
-            ),
-          ],
-          child: const MaterialApp(
-            home: AddLectureForm(categoryKey: 'fiqh', categoryNameAr: 'الفقه'),
-          ),
+        createTestWidgetWithProviders(
+          const AddLectureForm(),
+          authProvider: mockAuthProvider,
+          lectureProvider: mockLectureProvider,
+          hierarchyProvider: mockHierarchyProvider,
         ),
       );
 
@@ -192,18 +160,13 @@ void main() {
       );
 
       // Set future date and time
-      await tester.tap(find.text('اختيار التاريخ'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('اختيار الوقت'));
+      await tester.tap(find.text('اختر وقت البداية'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('OK'));
       await tester.pumpAndSettle();
 
       // Enter invalid URL
-      await tester.enterText(find.text('رابط الصوت (اختياري)'), 'invalid-url');
+      await tester.enterText(find.byType(TextFormField).at(4), 'invalid-url');
 
       // Try to save
       await tester.tap(find.text('حفظ'));
@@ -213,46 +176,4 @@ void main() {
       expect(find.text('صيغة رابط الصوت غير صحيحة'), findsOneWidget);
     });
   });
-}
-
-// Mock classes for testing
-class MockAuthProvider extends AuthProvider {
-  @override
-  String? get currentUid => 'test-sheikh-id';
-
-  @override
-  Map<String, dynamic>? get currentUser => {
-    'uid': 'test-sheikh-id',
-    'name': 'الشيخ التجريبي',
-    'email': 'test@example.com',
-    'role': 'sheikh',
-  };
-
-  @override
-  bool get isAuthenticated => true;
-}
-
-class MockLectureProvider extends LectureProvider {
-  @override
-  bool get isLoading => false;
-
-  @override
-  String? get errorMessage => null;
-
-  @override
-  Future<bool> addSheikhLecture({
-    required String sheikhId,
-    required String sheikhName,
-    required String categoryKey,
-    required String categoryNameAr,
-    required String title,
-    String? description,
-    required DateTime startTime,
-    DateTime? endTime,
-    Map<String, dynamic>? location,
-    Map<String, dynamic>? media,
-  }) async {
-    // Mock successful save
-    return true;
-  }
 }

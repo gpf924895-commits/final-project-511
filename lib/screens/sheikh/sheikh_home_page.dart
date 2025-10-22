@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:new_project/provider/pro_login.dart';
 import 'package:new_project/provider/lecture_provider.dart';
 import 'package:new_project/screens/sheikh/sheikh_category_picker.dart';
+import 'package:new_project/screens/sheikh/add_lecture_form.dart';
 import 'package:new_project/screens/sheikh/edit_lecture_page.dart';
 import 'package:new_project/screens/sheikh/delete_lecture_page.dart';
+import 'package:new_project/screens/sheikh/sheikh_hierarchy_manage_screen.dart';
 import 'package:new_project/widgets/sheikh_guard.dart';
 
 class SheikhHomePage extends StatefulWidget {
@@ -39,11 +41,19 @@ class _SheikhHomePageState extends State<SheikhHomePage> {
     setState(() => _isLoading = false);
   }
 
-  void _navigateToAdd() {
-    Navigator.push(
+  void _navigateToAdd() async {
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const SheikhCategoryPicker()),
     );
+
+    // If a section was selected (result == true), navigate to AddLectureForm
+    if (result == true) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const AddLectureForm()),
+      );
+    }
   }
 
   void _navigateToEdit() {
@@ -60,6 +70,15 @@ class _SheikhHomePageState extends State<SheikhHomePage> {
     );
   }
 
+  void _navigateToHierarchyManage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SheikhHierarchyManageScreen(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SheikhGuard(
@@ -73,9 +92,7 @@ class _SheikhHomePageState extends State<SheikhHomePage> {
               builder: (context, authProvider, child) {
                 return Column(
                   children: [
-                    Text(
-                      'مرحباً الشيخ ${authProvider.displayName}',
-                    ),
+                    Text('مرحباً الشيخ ${authProvider.displayName}'),
                     if (authProvider.currentUser?['categoryId'] != null)
                       Chip(
                         label: Text(
@@ -264,6 +281,21 @@ class _SheikhHomePageState extends State<SheikhHomePage> {
                         label: const Text('إزالة'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      ElevatedButton.icon(
+                        onPressed: _navigateToHierarchyManage,
+                        icon: const Icon(Icons.category),
+                        label: const Text('إدارة التصنيفات'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
                           foregroundColor: Colors.white,
                           minimumSize: const Size(double.infinity, 48),
                           shape: RoundedRectangleBorder(
