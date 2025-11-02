@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:new_project/provider/hierarchy_provider.dart';
 import 'package:new_project/utils/youtube_utils.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/offline/firestore_shims.dart';
 import '../widgets/app_drawer.dart';
 
 class LecturesListPage extends StatefulWidget {

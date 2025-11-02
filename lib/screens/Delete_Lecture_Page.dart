@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:new_project/database/firebase_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/offline/firestore_shims.dart';
 
 class DeleteLecturePage extends StatefulWidget {
   final String? section;
@@ -30,7 +30,7 @@ class _DeleteLecturePageState extends State<DeleteLecturePage> {
       } else {
         lectures = await _firebaseService.getAllLectures();
       }
-      
+
       setState(() {
         _lectures = lectures;
         _isLoading = false;
@@ -42,9 +42,9 @@ class _DeleteLecturePageState extends State<DeleteLecturePage> {
   }
 
   void _showMessage(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: color),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
   }
 
   Future<void> _confirmDelete(Map<String, dynamic> lecture) async {
@@ -95,7 +95,11 @@ class _DeleteLecturePageState extends State<DeleteLecturePage> {
                     const SizedBox(height: 8),
                     const Row(
                       children: [
-                        Icon(Icons.video_library, size: 18, color: Colors.orange),
+                        Icon(
+                          Icons.video_library,
+                          size: 18,
+                          color: Colors.orange,
+                        ),
                         SizedBox(width: 8),
                         Text(
                           'يحتوي على فيديو',
@@ -149,13 +153,16 @@ class _DeleteLecturePageState extends State<DeleteLecturePage> {
 
     if (confirmed == true) {
       setState(() => _isLoading = true);
-      
+
       final success = await _firebaseService.deleteLecture(lecture['id']);
-      
+
       setState(() => _isLoading = false);
-      
+
       if (success) {
-        _showMessage('🗑️ تم حذف المحاضرة "${lecture['title']}" بنجاح', Colors.green);
+        _showMessage(
+          '🗑️ تم حذف المحاضرة "${lecture['title']}" بنجاح',
+          Colors.green,
+        );
         _loadLectures();
       } else {
         _showMessage('فشل في حذف المحاضرة', Colors.red);
@@ -167,9 +174,11 @@ class _DeleteLecturePageState extends State<DeleteLecturePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.section != null 
-            ? 'حذف المحاضرات - ${widget.section}'
-            : 'حذف المحاضرات'),
+        title: Text(
+          widget.section != null
+              ? 'حذف المحاضرات - ${widget.section}'
+              : 'حذف المحاضرات',
+        ),
         backgroundColor: Colors.red,
         foregroundColor: Colors.white,
         centerTitle: true,
@@ -185,156 +194,177 @@ class _DeleteLecturePageState extends State<DeleteLecturePage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _lectures.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.delete_outline, size: 80, color: Colors.grey.shade400),
-                      const SizedBox(height: 16),
-                      Text(
-                        'لا توجد محاضرات للحذف',
-                        style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'جميع المحاضرات محذوفة أو لم يتم إضافة أي محاضرات بعد',
-                        style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.delete_outline,
+                    size: 80,
+                    color: Colors.grey.shade400,
                   ),
-                )
-              : Column(
-                  children: [
-                    // إحصائيات
-                    Container(
-                      margin: const EdgeInsets.all(16),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.red.shade200),
+                  const SizedBox(height: 16),
+                  Text(
+                    'لا توجد محاضرات للحذف',
+                    style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'جميع المحاضرات محذوفة أو لم يتم إضافة أي محاضرات بعد',
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            )
+          : Column(
+              children: [
+                // إحصائيات
+                Container(
+                  margin: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.library_books,
+                        color: Colors.red.shade700,
+                        size: 30,
                       ),
-                      child: Row(
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.library_books, color: Colors.red.shade700, size: 30),
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'إجمالي المحاضرات',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade700,
-                                ),
-                              ),
-                              Text(
-                                '${_lectures.length}',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.red.shade700,
-                                ),
-                              ),
-                            ],
+                          Text(
+                            'إجمالي المحاضرات',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                          Text(
+                            '${_lectures.length}',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red.shade700,
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                    
-                    // القائمة
-                    Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _lectures.length,
-                        itemBuilder: (context, index) {
-                          final lecture = _lectures[index];
-                          final hasVideo = lecture['video_path'] != null;
-                          final createdAt = lecture['created_at'] is Timestamp
-                              ? (lecture['created_at'] as Timestamp).toDate()
-                              : (lecture['created_at'] is String 
-                                  ? DateTime.tryParse(lecture['created_at']) ?? DateTime.now()
-                                  : DateTime.now());
-                          
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            elevation: 2,
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: Colors.red.shade100,
-                                child: Icon(
-                                  hasVideo ? Icons.video_library : Icons.book,
-                                  color: Colors.red.shade700,
-                                ),
+                    ],
+                  ),
+                ),
+
+                // القائمة
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: _lectures.length,
+                    itemBuilder: (context, index) {
+                      final lecture = _lectures[index];
+                      final hasVideo = lecture['video_path'] != null;
+                      final createdAt = lecture['created_at'] is Timestamp
+                          ? (lecture['created_at'] as Timestamp).toDate()
+                          : (lecture['created_at'] is String
+                                ? DateTime.tryParse(lecture['created_at']) ??
+                                      DateTime.now()
+                                : DateTime.now());
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        elevation: 2,
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.red.shade100,
+                            child: Icon(
+                              hasVideo ? Icons.video_library : Icons.book,
+                              color: Colors.red.shade700,
+                            ),
+                          ),
+                          title: Text(
+                            lecture['title'],
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                lecture['description'],
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              title: Text(
-                                lecture['title'],
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              const SizedBox(height: 4),
+                              Row(
                                 children: [
-                                  Text(
-                                    lecture['description'],
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  Icon(
+                                    Icons.category,
+                                    size: 14,
+                                    color: Colors.grey.shade600,
                                   ),
-                                  const SizedBox(height: 4),
-                                  Row(
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    lecture['section'],
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Icon(
+                                    Icons.calendar_today,
+                                    size: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${createdAt.year}-${createdAt.month.toString().padLeft(2, '0')}-${createdAt.day.toString().padLeft(2, '0')}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (hasVideo)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Row(
                                     children: [
-                                      Icon(Icons.category, size: 14, color: Colors.grey.shade600),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        lecture['section'],
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey.shade600,
-                                        ),
+                                      Icon(
+                                        Icons.videocam,
+                                        size: 14,
+                                        color: Colors.orange.shade600,
                                       ),
-                                      const SizedBox(width: 8),
-                                      Icon(Icons.calendar_today, size: 12, color: Colors.grey.shade600),
                                       const SizedBox(width: 4),
                                       Text(
-                                        '${createdAt.year}-${createdAt.month.toString().padLeft(2, '0')}-${createdAt.day.toString().padLeft(2, '0')}',
+                                        'يحتوي على فيديو',
                                         style: TextStyle(
                                           fontSize: 11,
-                                          color: Colors.grey.shade600,
+                                          color: Colors.orange.shade600,
                                         ),
                                       ),
                                     ],
                                   ),
-                                  if (hasVideo)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 4),
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.videocam, size: 14, color: Colors.orange.shade600),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'يحتوي على فيديو',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.orange.shade600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () => _confirmDelete(lecture),
-                              ),
-                              isThreeLine: true,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+                                ),
+                            ],
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => _confirmDelete(lecture),
+                          ),
+                          isThreeLine: true,
+                        ),
+                      );
+                    },
+                  ),
                 ),
+              ],
+            ),
     );
   }
 }

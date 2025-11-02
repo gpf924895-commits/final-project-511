@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/repository/local_repository.dart';
 import '../provider/sheikh_provider.dart';
 import '../provider/pro_login.dart';
 import 'sheikh_simple_chapters_screen.dart';
@@ -39,28 +39,14 @@ class _SheikhDashboardScreenState extends State<SheikhDashboardScreen> {
     if (categoryId == null || currentUid == null) return;
 
     try {
-      // Get total lessons
-      final totalQuery = await FirebaseFirestore.instance
-          .collection('lectures')
-          .where('categoryId', isEqualTo: categoryId)
-          .where('sheikhUid', isEqualTo: currentUid)
-          .get();
+      // For offline mode: Get stats from LocalRepository
+      final repository = LocalRepository();
+      final lectures = await repository.getLecturesBySheikh(currentUid);
 
-      // Get published lessons
-      final publishedQuery = await FirebaseFirestore.instance
-          .collection('lectures')
-          .where('categoryId', isEqualTo: categoryId)
-          .where('sheikhUid', isEqualTo: currentUid)
-          .where('status', isEqualTo: 'published')
-          .get();
-
-      // Get draft lessons
-      final draftQuery = await FirebaseFirestore.instance
-          .collection('lectures')
-          .where('categoryId', isEqualTo: categoryId)
-          .where('sheikhUid', isEqualTo: currentUid)
-          .where('status', isEqualTo: 'draft')
-          .get();
+      // Filter by categoryId
+      final categoryLectures = lectures
+          .where((lecture) => lecture['categoryId'] == categoryId)
+          .toList();
 
       // Get this week's lessons
       final now = DateTime.now();
@@ -68,23 +54,19 @@ class _SheikhDashboardScreenState extends State<SheikhDashboardScreen> {
         now.year,
         now.month,
         now.day - now.weekday + 1,
-      );
-      final thisWeekQuery = await FirebaseFirestore.instance
-          .collection('lectures')
-          .where('categoryId', isEqualTo: categoryId)
-          .where('sheikhUid', isEqualTo: currentUid)
-          .where(
-            'createdAt',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(weekStart),
-          )
-          .get();
+      ).millisecondsSinceEpoch;
 
       setState(() {
         _kpis = {
-          'total': totalQuery.docs.length,
-          'published': publishedQuery.docs.length,
-          'draft': draftQuery.docs.length,
-          'thisWeek': thisWeekQuery.docs.length,
+          'total': categoryLectures.length,
+          'published': categoryLectures
+              .where((l) => l['status'] == 'published')
+              .length,
+          'draft': categoryLectures.where((l) => l['status'] == 'draft').length,
+          'thisWeek': categoryLectures.where((l) {
+            final createdAt = l['createdAt'] as int? ?? 0;
+            return createdAt >= weekStart;
+          }).length,
         };
       });
     } catch (e) {

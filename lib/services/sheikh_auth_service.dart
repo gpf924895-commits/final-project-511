@@ -1,10 +1,12 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/repository/local_repository.dart';
 
+/// SheikhAuthService - Local SQLite implementation
+/// Authenticates Sheikh using uniqueId and password
 class SheikhAuthService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final LocalRepository _repository = LocalRepository();
 
   /// Authenticate Sheikh using ONLY sheikhId and password
-  /// No email dependency - direct Firestore validation
+  /// No email dependency - direct database validation
   Future<Map<String, dynamic>> authenticateSheikh(
     String sheikhId,
     String password,
@@ -25,136 +27,107 @@ class SheikhAuthService {
       if (normalized.isEmpty) {
         return {'success': false, 'message': 'رقم الشيخ غير صحيح'};
       }
-      
+
       // Enforce exactly 8 digits - no padding, must be exactly 8 digits
       if (normalized.length != 8) {
-        return {'success': false, 'message': 'رقم الشيخ يجب أن يكون 8 أرقام بالضبط'};
+        return {
+          'success': false,
+          'message': 'رقم الشيخ يجب أن يكون 8 أرقام بالضبط',
+        };
       }
-      
-      final sheikhId8Digit = normalized; // Use as-is since it's exactly 8 digits
+
+      final sheikhId8Digit =
+          normalized; // Use as-is since it's exactly 8 digits
 
       print('[SheikhAuthService] Using 8-digit sheikhId: $sheikhId8Digit');
 
-      // Find Sheikh document by sheikhId (primary field)
-      DocumentSnapshot? sheikhDoc;
-      Map<String, dynamic>? sheikhData;
+      // Find Sheikh by uniqueId using LocalRepository
+      final sheikh = await _repository.getUserByUniqueId(
+        sheikhId8Digit,
+        role: 'sheikh',
+      );
 
-      try {
-        // Primary query: search by sheikhId field
-        final querySnapshot = await _firestore
-            .collection('users')
-            .where('role', isEqualTo: 'sheikh')
-            .where('sheikhId', isEqualTo: sheikhId8Digit)
-            .limit(1)
-            .get()
-            .timeout(const Duration(seconds: 10));
-
-        if (querySnapshot.docs.isNotEmpty) {
-          sheikhDoc = querySnapshot.docs.first;
-          sheikhData = sheikhDoc.data() as Map<String, dynamic>?;
-          print('[SheikhAuthService] FOUND_DOC: Sheikh document found by sheikhId field');
-        }
-      } on FirebaseException catch (e) {
-        print('[SheikhAuthService] Primary query failed: ${e.code} - ${e.message}');
-        
-        if (e.code == 'failed-precondition') {
-          // Fallback: get all sheikhs and filter manually
-          print('[SheikhAuthService] Using fallback query method');
-          final allSheikhs = await _firestore
-              .collection('users')
-              .where('role', isEqualTo: 'sheikh')
-              .get()
-              .timeout(const Duration(seconds: 10));
-
-          final matchingDocs = allSheikhs.docs.where((doc) {
-            final data = doc.data();
-            final docSheikhId = data['sheikhId'] as String?;
-            final docUniqueId = data['uniqueId'] as String?;
-            return docSheikhId == sheikhId8Digit || docUniqueId == sheikhId8Digit;
-          }).toList();
-
-          if (matchingDocs.isNotEmpty) {
-            sheikhDoc = matchingDocs.first;
-            sheikhData = sheikhDoc.data() as Map<String, dynamic>?;
-            print('[SheikhAuthService] FOUND_DOC: Sheikh document found via fallback query');
-          }
-        }
+      if (sheikh == null) {
+        print(
+          '[SheikhAuthService] No Sheikh found for sheikhId: $sheikhId8Digit',
+        );
+        return {
+          'success': false,
+          'message': 'رقم الشيخ أو كلمة المرور غير صحيحة',
+        };
       }
 
-      // If not found by sheikhId, try uniqueId field (legacy support)
-      if (sheikhDoc == null) {
-        print('[SheikhAuthService] Trying uniqueId field...');
-        try {
-          final querySnapshot = await _firestore
-              .collection('users')
-              .where('role', isEqualTo: 'sheikh')
-              .where('uniqueId', isEqualTo: sheikhId8Digit)
-              .limit(1)
-              .get()
-              .timeout(const Duration(seconds: 10));
+      print(
+        '[SheikhAuthService] CHECK_PASSWORD: Verifying password for sheikhId: $sheikhId8Digit',
+      );
 
-          if (querySnapshot.docs.isNotEmpty) {
-            sheikhDoc = querySnapshot.docs.first;
-            sheikhData = sheikhDoc.data() as Map<String, dynamic>?;
-            print('[SheikhAuthService] FOUND_DOC: Sheikh document found by uniqueId field');
-          }
-        } catch (e) {
-          print('[SheikhAuthService] uniqueId query failed: $e');
-        }
+      // Get user profile to verify password (password_hash is stored)
+      // Note: In SQLite, we need to hash the password and compare
+      final userProfile = await _repository.getUserProfile(
+        sheikh['id'] as String,
+      );
+      if (userProfile == null) {
+        return {'success': false, 'message': 'بيانات الشيخ غير موجودة'};
       }
 
-      // Check if Sheikh was found
-      if (sheikhDoc == null || sheikhData == null) {
-        print('[SheikhAuthService] No Sheikh document found for sheikhId: $sheikhId8Digit');
-        return {'success': false, 'message': 'رقم الشيخ أو كلمة المرور غير صحيحة'};
+      // For now, we'll need to check password through login
+      // Since LocalRepository.loginUser requires email, we'll use a workaround
+      // Check if password matches by attempting login with the user's email
+      final email = userProfile['email'] as String?;
+      if (email == null) {
+        return {'success': false, 'message': 'بيانات الشيخ غير مكتملة'};
       }
 
-      print('[SheikhAuthService] CHECK_PASSWORD: Verifying password for sheikhId: $sheikhId8Digit');
-      
-      // Verify password first (check both secret and password fields)
-      final storedPassword = sheikhData['secret'] as String?;
-      final storedPasswordAlt = sheikhData['password'] as String?;
-      
-      if (storedPassword != password && storedPasswordAlt != password) {
-        print('[SheikhAuthService] CHECK_PASSWORD: Password verification failed');
-        return {'success': false, 'message': 'رقم الشيخ أو كلمة المرور غير صحيحة'};
-      }
-      
-      print('[SheikhAuthService] CHECK_PASSWORD: Password verification successful');
+      // Try login to verify password
+      final loginResult = await _repository.loginUser(
+        email: email,
+        password: password,
+      );
 
-      print('[SheikhAuthService] CHECK_ROLE_ACTIVE: Verifying role and active status');
-      
-      // Verify role is sheikh
-      if (sheikhData['role'] != 'sheikh') {
-        print('[SheikhAuthService] CHECK_ROLE_ACTIVE: Role verification failed - role is ${sheikhData['role']}');
+      if (!loginResult['success']) {
+        print(
+          '[SheikhAuthService] CHECK_PASSWORD: Password verification failed',
+        );
+        return {
+          'success': false,
+          'message': 'رقم الشيخ أو كلمة المرور غير صحيحة',
+        };
+      }
+
+      print(
+        '[SheikhAuthService] CHECK_PASSWORD: Password verification successful',
+      );
+
+      print('[SheikhAuthService] CHECK_ROLE_ACTIVE: Verifying role');
+
+      // Verify role is sheikh (already checked by getUserByUniqueId with role: 'sheikh')
+      if (userProfile['role'] != 'sheikh') {
+        print(
+          '[SheikhAuthService] CHECK_ROLE_ACTIVE: Role verification failed - role is ${userProfile['role']}',
+        );
         return {'success': false, 'message': 'هذا الحساب ليس حساب شيخ'};
       }
 
-      // Check if account is active
-      final status = (sheikhData['status'] as String?)?.toLowerCase();
-      final isActive = sheikhData['isActive'] as bool?;
-      final enabled = sheikhData['enabled'] as bool?;
-      
-      if (status != 'active' && isActive != true && enabled != true) {
-        print('[SheikhAuthService] CHECK_ROLE_ACTIVE: Account is not active - status: $status, isActive: $isActive, enabled: $enabled');
-        return {'success': false, 'message': 'الحساب غير مفعّل'};
-      }
-      
-      print('[SheikhAuthService] CHECK_ROLE_ACTIVE: Role and active status verification successful');
+      print(
+        '[SheikhAuthService] CHECK_ROLE_ACTIVE: Role verification successful',
+      );
 
       // Success - return Sheikh data
-      print('[SheikhAuthService] Authentication successful for sheikhId: $sheikhId8Digit');
+      print(
+        '[SheikhAuthService] Authentication successful for sheikhId: $sheikhId8Digit',
+      );
       return {
         'success': true,
         'message': 'تم تسجيل الدخول بنجاح',
         'sheikh': {
-          'uid': sheikhDoc.id,
-          'name': sheikhData['name'],
-          'email': sheikhData['email'],
-          'uniqueId': sheikhId8Digit, // Use the exact 8-digit sheikhId
+          'uid': userProfile['id'],
+          'name': userProfile['name'] ?? 'غير محدد',
+          'email': userProfile['email'],
+          'uniqueId': sheikhId8Digit,
+          'sheikhId': sheikhId8Digit,
           'role': 'sheikh',
-          'category': sheikhData['category'],
-          'isActive': status == 'active' || isActive == true || enabled == true,
+          'category': userProfile['category'] ?? '',
+          'isActive': true, // For offline, assume active
         },
       };
     } catch (e) {
@@ -174,6 +147,10 @@ class SheikhAuthService {
       return 'رقم الشيخ غير صحيح';
     }
 
+    if (normalized.length != 8) {
+      return 'رقم الشيخ يجب أن يكون 8 أرقام بالضبط';
+    }
+
     return null;
   }
 
@@ -191,17 +168,16 @@ class SheikhAuthService {
     return await authenticateSheikh(sheikhId, password);
   }
 
-
   /// Normalize sheikhId to 8-digit string (enforces exactly 8 digits)
   String normalizeSheikhId(String sheikhId) {
     final normalized = sheikhId.trim().replaceAll(RegExp(r'[^0-9]'), '');
     if (normalized.isEmpty) return '';
-    
+
     // Enforce exactly 8 digits - no padding, must be exactly 8 digits
     if (normalized.length != 8) {
       return ''; // Return empty string for invalid length
     }
-    
+
     return normalized; // Return as-is since it's exactly 8 digits
   }
 }

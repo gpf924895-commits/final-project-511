@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:new_project/provider/pro_login.dart';
 import 'package:new_project/services/sheikh_auth_service.dart';
-import 'package:new_project/utils/role_router.dart';
 
 class LoginPage extends StatefulWidget {
   final Function(bool) toggleTheme;
@@ -131,7 +130,7 @@ class _LoginPageState extends State<LoginPage>
         );
         return;
       }
-      
+
       // Enforce exactly 8 digits - no padding, must be exactly 8 digits
       if (normalized.length != 8) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -202,12 +201,10 @@ class _LoginPageState extends State<LoginPage>
           );
         }
       } else if (mounted) {
-        final message = result['message'] ?? 'رقم الشيخ أو كلمة المرور غير صحيحة';
+        final message =
+            result['message'] ?? 'رقم الشيخ أو كلمة المرور غير صحيحة';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
@@ -474,7 +471,10 @@ class _LoginPageState extends State<LoginPage>
                 if (value == null || value.trim().isEmpty) {
                   return 'يرجى إدخال المعرف الفريد';
                 }
-                final normalized = value.trim().replaceAll(RegExp(r'[^0-9]'), '');
+                final normalized = value.trim().replaceAll(
+                  RegExp(r'[^0-9]'),
+                  '',
+                );
                 if (normalized.isEmpty) {
                   return 'رقم الشيخ غير صحيح';
                 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:new_project/provider/pro_login.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/database/firebase_service.dart';
 
 class SheikhProgramCreateScreen extends StatefulWidget {
   const SheikhProgramCreateScreen({super.key});
@@ -64,34 +64,18 @@ class _SheikhProgramCreateScreenState extends State<SheikhProgramCreateScreen> {
     setState(() => _isSaving = true);
 
     try {
-      final programData = {
-        'name': _titleController.text.trim(),
-        'description': _descriptionController.text.trim(),
-        'displayOrder': int.tryParse(_displayOrderController.text.trim()) ?? 0,
-        'status': _status,
-        'createdBy': sheikhUid,
-        'createdByName': sheikhName,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
+      // Create program (subcategory) using LocalRepository via FirebaseService
+      final firebaseService = FirebaseService();
+      final result = await firebaseService.addSubcategory(
+        name: _titleController.text.trim(),
+        section: 'unknown', // TODO: Get section from context
+        description: _descriptionController.text.trim(),
+        iconName: null,
+      );
 
-      // Create program (subcategory)
-      final docRef = await FirebaseFirestore.instance
-          .collection('subcategories')
-          .add(programData);
-
-      // Create ownership/assignment doc
-      await FirebaseFirestore.instance
-          .collection('subcategories')
-          .doc(docRef.id)
-          .collection('sheikhs')
-          .doc(sheikhUid)
-          .set({
-            'sheikhUid': sheikhUid,
-            'sheikhName': sheikhName,
-            'enabled': true,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
+      if (!result['success']) {
+        throw Exception(result['message'] ?? 'فشل في إنشاء البرنامج');
+      }
 
       if (mounted) {
         Navigator.pop(context, true); // Return success

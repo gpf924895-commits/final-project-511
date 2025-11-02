@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:new_project/provider/pro_login.dart';
 import 'package:new_project/provider/lecture_provider.dart';
 import 'package:new_project/widgets/sheikh_guard.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/offline/firestore_shims.dart';
 
 class DeleteLecturePage extends StatefulWidget {
   const DeleteLecturePage({super.key});
@@ -151,7 +151,10 @@ class _DeleteLecturePageState extends State<DeleteLecturePage> {
             children: [
               // Active lectures section
               if (_lectures.isNotEmpty) ...[
-                _buildSectionHeader('المحاضرات النشطة', Colors.red[700] ?? Colors.red),
+                _buildSectionHeader(
+                  'المحاضرات النشطة',
+                  Colors.red[700] ?? Colors.red,
+                ),
                 const SizedBox(height: 8),
                 ..._lectures.map(
                   (lecture) => _buildLectureCard(lecture, false),
@@ -160,7 +163,10 @@ class _DeleteLecturePageState extends State<DeleteLecturePage> {
               ],
               // Archived lectures section
               if (_archivedLectures.isNotEmpty) ...[
-                _buildSectionHeader('المحاضرات المؤرشفة', Colors.orange[700] ?? Colors.orange),
+                _buildSectionHeader(
+                  'المحاضرات المؤرشفة',
+                  Colors.orange[700] ?? Colors.orange,
+                ),
                 const SizedBox(height: 8),
                 ..._archivedLectures.map(
                   (lecture) => _buildLectureCard(lecture, true),
@@ -367,7 +373,9 @@ class _DeleteLecturePageState extends State<DeleteLecturePage> {
                 decoration: BoxDecoration(
                   color: Colors.orange[50],
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange[200] ?? Colors.orange),
+                  border: Border.all(
+                    color: Colors.orange[200] ?? Colors.orange,
+                  ),
                 ),
                 child: Row(
                   children: [

@@ -5,7 +5,7 @@ import 'package:new_project/screens/sheikh/edit_lecture_page.dart';
 import 'package:new_project/screens/sheikh/delete_lecture_page.dart';
 import 'package:new_project/provider/pro_login.dart';
 import 'package:new_project/provider/lecture_provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/offline/firestore_shims.dart';
 
 void main() {
   group('Sheikh Edit/Delete Tests', () {

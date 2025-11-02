@@ -43,10 +43,8 @@ service cloud.firestore {
       allow create, update, delete:
         if isAuthenticated()
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sheikh"
-        && request.resource.data.sheikhUid == request.auth.uid
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.categoryId ==
-           get(/databases/$(database)/documents/sheikhs/$(request.auth.uid)).data.categoryId;
+        && (request.resource.data.sheikhUid == request.auth.uid || request.resource.data.sheikhId == request.auth.uid)
+        && request.resource.data.createdBy == request.auth.uid;
     }
     
     // Chapters collection rules - sheikh access only
@@ -55,10 +53,8 @@ service cloud.firestore {
       allow create, update, delete:
         if isAuthenticated()
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "sheikh"
-        && request.resource.data.sheikhUid == request.auth.uid
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.categoryId ==
-           get(/databases/$(database)/documents/sheikhs/$(request.auth.uid)).data.categoryId;
+        && (request.resource.data.sheikhUid == request.auth.uid || request.resource.data.sheikhId == request.auth.uid)
+        && request.resource.data.createdBy == request.auth.uid;
     }
     
     // Deny all other collections by default

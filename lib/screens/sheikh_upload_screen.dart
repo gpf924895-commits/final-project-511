@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:new_project/offline/firestore_shims.dart';
+import 'package:new_project/database/firebase_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import '../provider/sheikh_provider.dart';
@@ -112,13 +112,9 @@ class _SheikhUploadScreenState extends State<SheikhUploadScreen> {
           '${DateTime.now().millisecondsSinceEpoch}.${_selectedFile?.path.split('.').last ?? 'unknown'}';
       final storagePath = 'lessons_media/$currentUid/$fileName';
 
-      final ref = FirebaseStorage.instance.ref().child(storagePath);
-
-      final uploadTask = ref.putFile(_selectedFile ?? File(''));
-
-      // Wait for upload to complete
-      final snapshot = await uploadTask;
-      final downloadUrl = await snapshot.ref.getDownloadURL();
+      // For offline mode: Store file path locally
+      // TODO: Implement local file storage
+      final downloadUrl = _selectedFile?.path; // Use local file path
 
       final fileSize = await (_selectedFile?.length() ?? Future.value(0));
 
@@ -204,18 +200,51 @@ class _SheikhUploadScreenState extends State<SheikhUploadScreen> {
           },
       };
 
+      // For offline mode: Use LocalRepository via FirebaseService
+      final firebaseService = FirebaseService();
+
       if (widget.lectureId != null) {
         // Update existing lecture
-        await FirebaseFirestore.instance
-            .collection('lectures')
-            .doc(widget.lectureId)
-            .update(lectureData);
+        await firebaseService.updateLecture(
+          id: widget.lectureId!,
+          title: lectureData['title'] ?? '',
+          description: lectureData['description'] ?? '',
+          videoPath: _mediaUrl,
+          section: lectureData['section'] ?? '',
+          subcategoryId: lectureData['subcategoryId'],
+        );
       } else {
-        // Create new lecture
-        lectureData['createdAt'] = Timestamp.fromDate(now);
-        await FirebaseFirestore.instance
-            .collection('lectures')
-            .add(lectureData);
+        // Create new lecture - use addSheikhLecture if sheikh, otherwise addLecture
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final currentUid = authProvider.currentUid;
+
+        if (currentUid != null && authProvider.isSheikh) {
+          await firebaseService.addSheikhLecture(
+            sheikhId: currentUid,
+            sheikhName: authProvider.currentUser?['name'] ?? 'شيخ',
+            section: lectureData['section'] ?? '',
+            categoryId: lectureData['categoryId'] ?? '',
+            categoryName: lectureData['categoryName'] ?? '',
+            subcategoryId: lectureData['subcategoryId'],
+            subcategoryName: lectureData['subcategoryName'],
+            title: lectureData['title'] ?? '',
+            description: lectureData['description'],
+            startTime: Timestamp.fromDate(now),
+            endTime: lectureData['endTime'] != null
+                ? Timestamp.fromDate(lectureData['endTime'] as DateTime)
+                : null,
+            location: lectureData['location'],
+            media: lectureData['media'],
+          );
+        } else {
+          await firebaseService.addLecture(
+            title: lectureData['title'] ?? '',
+            description: lectureData['description'] ?? '',
+            videoPath: _mediaUrl,
+            section: lectureData['section'] ?? '',
+            subcategoryId: lectureData['subcategoryId'],
+          );
+        }
       }
 
       if (mounted) {

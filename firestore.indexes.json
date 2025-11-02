@@ -1,23 +1,15 @@
 {
   "indexes": [
     {
-      "collectionGroup": "categories",
+      "collectionGroup": "lectures",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "section",
+          "fieldPath": "sheikhId",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "isActive",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "order",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
+          "fieldPath": "startTime",
           "order": "DESCENDING"
         }
       ]
@@ -36,72 +28,6 @@
         },
         {
           "fieldPath": "order",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "lectures",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "section",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "isPublished",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "lectures",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "section",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "categoryId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "isPublished",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "lectures",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "section",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "categoryId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "subcategoryId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "isPublished",
           "order": "ASCENDING"
         },
         {

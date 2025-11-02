@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:new_project/provider/pro_login.dart';
 import 'package:new_project/services/subcategory_service.dart';
 import 'package:new_project/widgets/sheikh_chapter_form.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SheikhChapterManageScreen extends StatefulWidget {
   const SheikhChapterManageScreen({super.key});
@@ -15,7 +14,7 @@ class SheikhChapterManageScreen extends StatefulWidget {
 
 class _SheikhChapterManageScreenState extends State<SheikhChapterManageScreen> {
   final SubcategoryService _subcategoryService = SubcategoryService();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // Removed FirebaseFirestore - use LocalRepository via services
   List<Map<String, dynamic>> _assignedSubcategories = [];
   bool _isLoading = true;
 
@@ -74,23 +73,14 @@ class _SheikhChapterManageScreenState extends State<SheikhChapterManageScreen> {
     }
 
     try {
-      await _firestore
-          .collection('subcategories')
-          .doc(subcatId)
-          .collection('sheikhs')
-          .doc(sheikhUid)
-          .collection('chapters')
-          .add({
-            'title': data['title'],
-            'sheikhName': data['sheikhName'],
-            'scheduledAt': data['scheduledAt'],
-            'details': data['details'],
-            'status': data['status'],
-            'order': 0,
-            'createdAt': FieldValue.serverTimestamp(),
-            'createdBy': sheikhUid,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
+      // TODO: Implement chapter creation in LocalRepository
+      // For now, use SubcategoryService which is stubbed
+      await _subcategoryService.createChapter(
+        subcatId,
+        sheikhUid,
+        data['title'] ?? '',
+        data,
+      );
 
       if (mounted) {
         Navigator.pop(context, true); // Return success

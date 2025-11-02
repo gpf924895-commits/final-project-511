@@ -5,7 +5,8 @@ import 'package:new_project/services/subcategory_service.dart';
 import 'package:new_project/utils/auth_guard.dart';
 import 'package:new_project/utils/youtube_utils.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/offline/firestore_shims.dart';
+import 'package:new_project/repository/local_repository.dart';
 import '../widgets/app_drawer.dart';
 
 class ChapterLessonsPage extends StatefulWidget {
@@ -38,7 +39,7 @@ class ChapterLessonsPage extends StatefulWidget {
 
 class _ChapterLessonsPageState extends State<ChapterLessonsPage> {
   final SubcategoryService _service = SubcategoryService();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final LocalRepository _repository = LocalRepository();
 
   @override
   void initState() {
@@ -46,22 +47,26 @@ class _ChapterLessonsPageState extends State<ChapterLessonsPage> {
     // No need to call _loadLessons() as we'll use StreamBuilder
   }
 
-  // Get real-time stream of Sheikh lectures
+  // Get real-time stream of Sheikh lectures (polling for offline mode)
   Stream<List<Map<String, dynamic>>> _getSheikhLecturesStream() {
-    return _firestore
-        .collection('lectures')
-        .where('sheikhId', isEqualTo: widget.sheikhUid)
-        .where('isPublished', isEqualTo: true)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          print('[ChapterLessonsPage] Snapshot size: ${snapshot.docs.length}');
-          return snapshot.docs.map((doc) {
-            final data = doc.data();
-            data['id'] = doc.id;
-            return data;
-          }).toList();
+    // For offline mode: Poll every 2 seconds
+    return Stream.periodic(const Duration(seconds: 2), (_) async {
+      final lectures = await _repository.getLecturesBySheikh(widget.sheikhUid);
+      // Filter published only and sort by createdAt desc
+      return lectures
+          .where(
+            (lecture) =>
+                (lecture['isPublished'] as int? ?? 0) == 1 &&
+                lecture['status'] != 'archived' &&
+                lecture['status'] != 'deleted',
+          )
+          .toList()
+        ..sort((a, b) {
+          final aTime = a['createdAt'] as int? ?? 0;
+          final bTime = b['createdAt'] as int? ?? 0;
+          return bTime.compareTo(aTime);
         });
+    }).asyncMap((future) => future);
   }
 
   Future<void> _addLesson() async {

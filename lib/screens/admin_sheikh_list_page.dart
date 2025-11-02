@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:new_project/services/sheikh_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/offline/firestore_shims.dart';
 
 class AdminSheikhListPage extends StatefulWidget {
   const AdminSheikhListPage({super.key});
@@ -123,6 +123,7 @@ class _AdminSheikhListPageState extends State<AdminSheikhListPage> {
   String _formatDate(dynamic dateValue) {
     try {
       DateTime date;
+      // Import Timestamp from shims if needed
       if (dateValue is Timestamp) {
         date = dateValue.toDate();
       } else if (dateValue is String) {

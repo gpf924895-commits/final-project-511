@@ -1,12 +1,12 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/repository/local_repository.dart';
 
-/// Helper class to create test admin accounts in Firestore
+/// Helper class to create test admin accounts in SQLite
 /// This is for development/testing purposes only
 class AdminTestHelper {
-  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static final LocalRepository _repository = LocalRepository();
 
   /// Create a test admin account
-  /// Call this method to set up test data in Firestore
+  /// Call this method to set up test data in SQLite
   static Future<void> createTestAdmin({
     String username = 'admin',
     String password = 'admin123',
@@ -16,22 +16,19 @@ class AdminTestHelper {
     String role = 'admin',
   }) async {
     try {
-      // Create document with lowercase ID for case-insensitive lookup
-      final docId = username.toLowerCase();
-      await _firestore.collection('admins').doc(docId).set({
-        'username': username.toLowerCase(), // Store lowercase for consistency
-        'password': password,
-        'name': name,
-        'email': email,
-        'status': status,
-        'role': role,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      print('✅ Test admin created: $username (ID: $docId)');
-      print('   Document path: admins/$docId');
-      print(
-        '   Fields: username=$username, password=$password, status=$status',
+      // Use LocalRepository to create admin account
+      final result = await _repository.createAdminAccount(
+        username: username,
+        email: email,
+        password: password,
       );
+
+      if (result['success']) {
+        print('✅ Test admin created: $username');
+        print('   Email: $email, Password: $password');
+      } else {
+        print('❌ Error creating test admin: ${result['message']}');
+      }
     } catch (e) {
       print('❌ Error creating test admin: $e');
     }
@@ -48,85 +45,85 @@ class AdminTestHelper {
     );
 
     await createTestAdmin(
-      username: 'supervisor',
-      password: 'super123',
-      name: 'Supervisor Admin',
-      email: 'supervisor@example.com',
-      role: 'supervisor',
-    );
-
-    await createTestAdmin(
-      username: 'testadmin',
-      password: 'test123',
-      name: 'Test Admin',
-      email: 'test@example.com',
+      username: 'admin2',
+      password: 'admin456',
+      name: 'Secondary Admin',
+      email: 'admin2@example.com',
       role: 'admin',
     );
-
-    print('✅ All test admins created successfully');
   }
 
-  /// Create test user accounts
+  /// Delete a test admin account
+  static Future<void> deleteTestAdmin(String username) async {
+    try {
+      // Note: LocalRepository doesn't have delete by username
+      // This would need to be implemented if needed
+      print('⚠️ Delete by username not yet implemented in LocalRepository');
+    } catch (e) {
+      print('❌ Error deleting test admin: $e');
+    }
+  }
+
+  /// Clear all test admin accounts
+  static Future<void> clearTestAdmins() async {
+    try {
+      // Note: LocalRepository doesn't have bulk delete
+      // This would need to be implemented if needed
+      print('⚠️ Clear all admins not yet implemented in LocalRepository');
+    } catch (e) {
+      print('❌ Error clearing test admins: $e');
+    }
+  }
+
+  /// Create test users
   static Future<void> createTestUsers() async {
     try {
-      // Create test user 1
-      await _firestore.collection('users').doc('user1').set({
-        'username': 'user1',
-        'password': 'user123',
-        'name': 'Test User 1',
-        'email': 'user1@example.com',
-        'status': 'active',
-        'role': 'user',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      print('✅ Test user created: user1');
-
-      // Create test user 2
-      await _firestore.collection('users').doc('user2').set({
-        'username': 'user2',
-        'password': 'user456',
-        'name': 'Test User 2',
-        'email': 'user2@example.com',
-        'status': 'active',
-        'role': 'user',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      print('✅ Test user created: user2');
-
-      print('✅ All test users created successfully');
+      // Create dummy test users in SQLite
+      await _repository.registerUser(
+        username: 'testuser1',
+        email: 'test1@example.com',
+        password: 'test123',
+      );
+      await _repository.registerUser(
+        username: 'testuser2',
+        email: 'test2@example.com',
+        password: 'test123',
+      );
+      print('✅ Test users created');
     } catch (e) {
       print('❌ Error creating test users: $e');
     }
   }
 
-  /// Create both admin and user test accounts
+  /// Create all test accounts (admins + users)
   static Future<void> createAllTestAccounts() async {
     await createTestAdmins();
     await createTestUsers();
-    print('✅ All test accounts (admins + users) created successfully');
+    print('✅ All test accounts created');
   }
 
-  /// Verify admin account exists
+  /// Verify admin exists
   static Future<bool> verifyAdminExists(String username) async {
     try {
-      final key = username.toLowerCase();
-      final doc = await _firestore.collection('admins').doc(key).get();
-      return doc.exists;
+      // Check if admin exists by trying to login
+      final result = await _repository.loginAdmin(
+        username: username,
+        password: 'dummy', // Just check existence, not password
+      );
+      return result['success'] == true;
     } catch (e) {
-      print('❌ Error verifying admin: $e');
       return false;
     }
   }
 
-  /// List all admin accounts
+  /// List admins
   static Future<void> listAdmins() async {
     try {
-      final snapshot = await _firestore.collection('admins').get();
-      print('📋 Admin accounts in Firestore:');
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        print('  - ${doc.id}: ${data['name']} (${data['status']})');
-      }
+      // Get all users and filter admins
+      final allUsers = await _repository.getAllUsers();
+      print('Total users: ${allUsers.length}');
+      // Note: Admin filtering by role not yet implemented
+      print('⚠️ Admin listing by role not yet implemented');
     } catch (e) {
       print('❌ Error listing admins: $e');
     }

@@ -6,7 +6,6 @@ import 'package:new_project/services/subcategory_service.dart';
 import 'package:new_project/widgets/sheikh_add_action_picker.dart';
 import 'package:new_project/widgets/sheikh_chapter_form.dart';
 import 'package:new_project/widgets/sheikh_lesson_form.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SheikhDashboardPage extends StatefulWidget {
   const SheikhDashboardPage({super.key});
@@ -20,7 +19,7 @@ class _SheikhDashboardPageState extends State<SheikhDashboardPage>
   late TabController _tabController;
   final LessonService _lessonService = LessonService();
   final SubcategoryService _subcategoryService = SubcategoryService();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // Removed FirebaseFirestore - use LocalRepository via services
 
   Map<String, int>? _stats;
   List<Map<String, dynamic>> _assignedSubcategories = [];
@@ -189,40 +188,14 @@ class _SheikhDashboardPageState extends State<SheikhDashboardPage>
     if (sheikhUid == null) return;
 
     try {
-      if (existingId == null) {
-        await _firestore
-            .collection('subcategories')
-            .doc(data['subcatId'])
-            .collection('sheikhs')
-            .doc(sheikhUid)
-            .collection('chapters')
-            .add({
-              'title': data['title'],
-              'sheikhName': data['sheikhName'],
-              'scheduledAt': data['scheduledAt'],
-              'details': data['details'],
-              'status': data['status'],
-              'order': 0,
-              'createdAt': FieldValue.serverTimestamp(),
-              'createdBy': sheikhUid,
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-      } else {
-        await _firestore
-            .collection('subcategories')
-            .doc(data['subcatId'])
-            .collection('sheikhs')
-            .doc(sheikhUid)
-            .collection('chapters')
-            .doc(existingId)
-            .update({
-              'title': data['title'],
-              'scheduledAt': data['scheduledAt'],
-              'details': data['details'],
-              'status': data['status'],
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-      }
+      // TODO: Implement chapter creation in LocalRepository
+      // For now, use SubcategoryService which is stubbed
+      await _subcategoryService.createChapter(
+        data['subcatId'] ?? '',
+        sheikhUid,
+        data['title'] ?? '',
+        data,
+      );
 
       if (mounted) {
         Navigator.pop(context);
@@ -276,58 +249,15 @@ class _SheikhDashboardPageState extends State<SheikhDashboardPage>
     if (sheikhUid == null) return;
 
     try {
-      if (existingId == null) {
-        await _firestore
-            .collection('subcategories')
-            .doc(data['subcatId'])
-            .collection('sheikhs')
-            .doc(sheikhUid)
-            .collection('chapters')
-            .doc(data['chapterId'])
-            .collection('lessons')
-            .add({
-              'title': data['title'],
-              'sheikhName': data['sheikhName'],
-              'abstract': data['abstract'],
-              'tags': data['tags'],
-              'scheduledAt': data['scheduledAt'],
-              'recordedAt': data['recordedAt'],
-              'publishAt': data['publishAt'],
-              'publishedAt': data['publishedAt'],
-              'status': data['status'],
-              'mediaUrl': data['mediaUrl'],
-              'mediaType': data['mediaType'],
-              'mediaSize': data['mediaSize'],
-              'order': 0,
-              'createdAt': FieldValue.serverTimestamp(),
-              'createdBy': sheikhUid,
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-      } else {
-        await _firestore
-            .collection('subcategories')
-            .doc(data['subcatId'])
-            .collection('sheikhs')
-            .doc(sheikhUid)
-            .collection('chapters')
-            .doc(data['chapterId'])
-            .collection('lessons')
-            .doc(existingId)
-            .update({
-              'title': data['title'],
-              'abstract': data['abstract'],
-              'tags': data['tags'],
-              'scheduledAt': data['scheduledAt'],
-              'recordedAt': data['recordedAt'],
-              'publishAt': data['publishAt'],
-              'publishedAt': data['publishedAt'],
-              'status': data['status'],
-              'mediaUrl': data['mediaUrl'],
-              'mediaType': data['mediaType'],
-              'mediaSize': data['mediaSize'],
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-      }
+      // TODO: Implement lesson creation in LocalRepository
+      // For now, use SubcategoryService which is stubbed
+      await _subcategoryService.createLesson(
+        data['subcatId'] ?? '',
+        sheikhUid,
+        data['chapterId'] ?? '',
+        sheikhUid,
+        data,
+      );
 
       if (mounted) {
         Navigator.pop(context);

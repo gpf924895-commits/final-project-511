@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/offline/firestore_shims.dart';
 import '../provider/sheikh_provider.dart';
 import '../provider/pro_login.dart';
 import '../provider/chapter_provider.dart';

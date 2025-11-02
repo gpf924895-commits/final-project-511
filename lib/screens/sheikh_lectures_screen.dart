@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/offline/firestore_shims.dart';
+import 'package:new_project/repository/local_repository.dart';
+import 'package:new_project/database/firebase_service.dart';
 import '../provider/sheikh_provider.dart';
 import '../provider/pro_login.dart';
 import 'sheikh_upload_screen.dart';
@@ -131,18 +133,24 @@ class _SheikhLecturesScreenState extends State<SheikhLecturesScreen> {
   }
 
   Widget _buildLecturesList(String categoryId, String currentUid) {
-    Query query = FirebaseFirestore.instance
-        .collection('lectures')
-        .where('categoryId', isEqualTo: categoryId)
-        .where('sheikhUid', isEqualTo: currentUid)
-        .orderBy('updatedAt', descending: true);
+    // For offline mode: Use LocalRepository with polling
+    final repository = LocalRepository();
 
-    if (_selectedFilter != 'all') {
-      query = query.where('status', isEqualTo: _selectedFilter);
-    }
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: query.snapshots(),
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: Stream.periodic(const Duration(seconds: 2), (_) async {
+        final lectures = await repository.getLecturesBySheikh(currentUid);
+        // Filter by categoryId and status
+        return lectures.where((lecture) {
+          final matchesCategory = lecture['categoryId'] == categoryId;
+          final matchesFilter =
+              _selectedFilter == 'all' || lecture['status'] == _selectedFilter;
+          return matchesCategory && matchesFilter;
+        }).toList()..sort((a, b) {
+          final aTime = a['updatedAt'] as int? ?? 0;
+          final bTime = b['updatedAt'] as int? ?? 0;
+          return bTime.compareTo(aTime);
+        });
+      }).asyncMap((future) => future),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -165,7 +173,7 @@ class _SheikhLecturesScreenState extends State<SheikhLecturesScreen> {
           );
         }
 
-        final lectures = snapshot.data?.docs ?? [];
+        final lectures = snapshot.data ?? [];
 
         if (lectures.isEmpty) {
           return Center(
@@ -215,8 +223,8 @@ class _SheikhLecturesScreenState extends State<SheikhLecturesScreen> {
             itemCount: lectures.length,
             itemBuilder: (context, index) {
               final lecture = lectures[index];
-              final data = lecture.data() as Map<String, dynamic>;
-              return _buildLectureCard(lecture.id, data);
+              final lectureId = lecture['id'] as String? ?? '';
+              return _buildLectureCard(lectureId, lecture);
             },
           ),
         );
@@ -397,10 +405,15 @@ class _SheikhLecturesScreenState extends State<SheikhLecturesScreen> {
 
   Future<void> _deleteLecture(String lectureId) async {
     try {
-      await FirebaseFirestore.instance
-          .collection('lectures')
-          .doc(lectureId)
-          .delete();
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final currentUid = authProvider.currentUid;
+      if (currentUid == null) return;
+
+      final firebaseService = FirebaseService();
+      await firebaseService.deleteSheikhLecture(
+        lectureId: lectureId,
+        sheikhId: currentUid,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(
@@ -416,4 +429,3 @@ class _SheikhLecturesScreenState extends State<SheikhLecturesScreen> {
     }
   }
 }
-

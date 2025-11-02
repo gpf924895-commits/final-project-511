@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/offline/firestore_shims.dart';
 import 'package:new_project/provider/lecture_provider.dart';
 import 'package:new_project/provider/prayer_times_provider.dart';
 import 'package:new_project/provider/location_provider.dart';

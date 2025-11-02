@@ -130,3 +130,102 @@ Currently only uses single-field sorting (`order`), which doesn't require a comp
 - Go to Firebase Console → Firestore Database → Indexes
 - Check that index status shows "Enabled" (green)
 - If status is "Building", wait and refresh periodically
+
+## Offline Caching with SQLite
+
+This app includes a local SQLite caching layer that enables offline reading of lectures, subcategories, and users. Firestore remains the source of truth for all data.
+
+### How It Works
+
+1. **On App Startup:**
+   - SQLite database (`local_data.db`) is created/opened in the app's database directory
+   - A one-way sync runs from Firestore → SQLite, populating local tables
+   - Logs show database path and row counts for each table
+
+2. **Reading Data:**
+   - All lecture reads go through `AppRepository` which queries SQLite first (fast, offline-capable)
+   - If the device is online, background sync refreshes SQLite from Firestore (non-blocking)
+   - UI receives data immediately from SQLite cache
+
+3. **Writing Data:**
+   - Writes still go directly to Firestore via `FirebaseService`
+   - After a successful write, the record can be upserted into SQLite for immediate local visibility (TODO: implement this optimization)
+
+### Querying from SQLite in UI
+
+The `AppRepository` class provides SQLite-first methods:
+
+```dart
+final repository = AppRepository();
+
+// Get lectures by section (SQLite-first, background refresh if online)
+final lectures = await repository.getLecturesBySection('الفقه');
+
+// Search lectures locally (offline-capable)
+final results = await repository.searchLecturesLocal('search query');
+
+// Get all lectures
+final allLectures = await repository.getAllLectures();
+
+// Get subcategories by section
+final subcategories = await repository.getSubcategoriesBySection('الفقه');
+```
+
+### Database Schema
+
+**Tables:**
+- `users` - Cached user profiles
+- `subcategories` - Cached subcategory definitions  
+- `lectures` - Cached lecture data
+
+**Indexes:**
+- `users(email)` - Fast user lookup by email
+- `subcategories(section)` - Filter subcategories by section
+- `lectures(section)` - Filter lectures by section
+- `lectures(sheikhId)` - Filter lectures by sheikh
+
+### Sync Service
+
+The `SyncService` class handles one-way synchronization:
+
+```dart
+final syncService = SyncService();
+
+// Sync all collections
+await syncService.syncAll();
+
+// Sync individual collections
+await syncService.syncUsers();
+await syncService.syncSubcategories();
+await syncService.syncLectures();
+
+// Optional: Live sync (listens to Firestore changes)
+syncService.liveSyncLectures().listen((_) {
+  // SQLite updated from Firestore real-time changes
+});
+```
+
+### Manual Testing
+
+1. **First Run with Internet:**
+   - App starts and syncs Firestore → SQLite
+   - Check logs for database path and row counts (should be > 0)
+
+2. **Offline Mode:**
+   - Turn off internet/airplane mode
+   - App should still display lectures from SQLite cache
+   - No crashes, data loads instantly
+
+3. **Re-sync After Changes:**
+   - Re-enable internet
+   - Add/edit a lecture in Firestore Console
+   - Re-open app or trigger manual sync
+   - SQLite should reflect the changes
+
+### Security Note (TODO)
+
+⚠️ **IMPORTANT:** The current Firebase users collection stores plaintext passwords. This is a security risk. Consider migrating to:
+- Firebase Authentication (recommended)
+- Or at least hashed passwords (e.g., bcrypt) if custom auth is required
+
+See `lib/database/firebase_service.dart` for current implementation.

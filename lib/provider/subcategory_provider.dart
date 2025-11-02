@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:new_project/database/firebase_service.dart';
+import 'package:new_project/repository/local_repository.dart';
 
 class SubcategoryProvider extends ChangeNotifier {
-  final FirebaseService _firebaseService = FirebaseService();
-  
+  final LocalRepository _repository = LocalRepository();
+
   Map<String, List<Map<String, dynamic>>> _subcategoriesBySection = {};
   bool _isLoading = false;
   String? _errorMessage;
@@ -11,7 +11,7 @@ class SubcategoryProvider extends ChangeNotifier {
   // Getters
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-  
+
   List<Map<String, dynamic>> getSubcategoriesBySection(String section) {
     return _subcategoriesBySection[section] ?? [];
   }
@@ -40,7 +40,9 @@ class SubcategoryProvider extends ChangeNotifier {
     _setError(null);
 
     try {
-      final subcategories = await _firebaseService.getSubcategoriesBySection(section);
+      final subcategories = await _repository.getSubcategoriesBySection(
+        section,
+      );
       _subcategoriesBySection[section] = subcategories;
       _setLoading(false);
       notifyListeners();
@@ -57,12 +59,14 @@ class SubcategoryProvider extends ChangeNotifier {
 
     try {
       final sections = ['الفقه', 'الحديث', 'التفسير', 'السيرة'];
-      
+
       for (String section in sections) {
-        final subcategories = await _firebaseService.getSubcategoriesBySection(section);
+        final subcategories = await _repository.getSubcategoriesBySection(
+          section,
+        );
         _subcategoriesBySection[section] = subcategories;
       }
-      
+
       _setLoading(false);
       notifyListeners();
     } catch (e) {
@@ -82,7 +86,7 @@ class SubcategoryProvider extends ChangeNotifier {
     _setError(null);
 
     try {
-      final result = await _firebaseService.addSubcategory(
+      final result = await _repository.addSubcategory(
         name: name,
         section: section,
         description: description,
@@ -117,7 +121,7 @@ class SubcategoryProvider extends ChangeNotifier {
     _setError(null);
 
     try {
-      final result = await _firebaseService.updateSubcategory(
+      final result = await _repository.updateSubcategory(
         id: id,
         name: name,
         description: description,
@@ -146,7 +150,7 @@ class SubcategoryProvider extends ChangeNotifier {
     _setError(null);
 
     try {
-      final success = await _firebaseService.deleteSubcategory(id);
+      final success = await _repository.deleteSubcategory(id);
 
       if (success) {
         await loadSubcategoriesBySection(section);
@@ -164,4 +168,3 @@ class SubcategoryProvider extends ChangeNotifier {
     }
   }
 }
-

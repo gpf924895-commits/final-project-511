@@ -4,7 +4,7 @@ import 'package:new_project/provider/pro_login.dart';
 import 'package:new_project/provider/lecture_provider.dart';
 import 'package:new_project/screens/sheikh/sheikh_home_page.dart';
 import 'package:new_project/widgets/sheikh_guard.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/offline/firestore_shims.dart';
 
 class EditLecturePage extends StatefulWidget {
   const EditLecturePage({super.key});
@@ -467,7 +467,9 @@ class _EditLectureFormState extends State<EditLectureForm> {
                           decoration: BoxDecoration(
                             color: Colors.red[50],
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.red[200] ?? Colors.red),
+                            border: Border.all(
+                              color: Colors.red[200] ?? Colors.red,
+                            ),
                           ),
                           child: Row(
                             children: [
@@ -479,7 +481,8 @@ class _EditLectureFormState extends State<EditLectureForm> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  lectureProvider.errorMessage ?? 'خطأ غير معروف',
+                                  lectureProvider.errorMessage ??
+                                      'خطأ غير معروف',
                                   style: TextStyle(color: Colors.red[700]),
                                 ),
                               ),

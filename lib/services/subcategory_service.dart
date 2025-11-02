@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/repository/local_repository.dart';
 import 'dart:developer' as developer;
 
 class SubcategoryServiceException implements Exception {
@@ -16,111 +16,48 @@ class SubcategoryServiceException implements Exception {
   String toString() => message;
 }
 
+/// SubcategoryService - Local SQLite implementation
+/// Provides sheikh assignment and chapter/lesson management
 class SubcategoryService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final LocalRepository _repository = LocalRepository();
 
   // List sheikhs assigned to a subcategory
+  // Note: In SQLite, we'll store assignments in a separate table or in lecture data
   Future<List<Map<String, dynamic>>> listSheikhs(String subcatId) async {
     try {
-      final snapshot = await _firestore
-          .collection('subcategories')
-          .doc(subcatId)
-          .collection('sheikhs')
-          .where('enabled', isEqualTo: true)
-          .orderBy('createdAt', descending: false)
-          .get();
+      // For offline-only: Get sheikhs from lectures with this subcategory
+      final lectures = await _repository.getLecturesBySubcategory(subcatId);
+      final sheikhIds = <String, Map<String, dynamic>>{};
 
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return data;
-      }).toList();
-    } on FirebaseException catch (e) {
-      // Check if this is an index requirement error
-      if (e.code == 'failed-precondition' && e.message != null) {
-        // Extract index creation URL from error message
-        final message = e.message ?? 'Unknown error';
-        String? indexUrl;
-
-        // Firestore error messages contain the index URL
-        final urlMatch = RegExp(
-          r'https://console\.firebase\.google\.com[^\s]+',
-        ).firstMatch(message);
-        if (urlMatch != null) {
-          indexUrl = urlMatch.group(0);
-          developer.log(
-            'Firestore Index Required for Sheikhs Query',
-            name: 'SubcategoryService',
-            error: 'Missing composite index',
-          );
-          developer.log(
-            'Create index at: $indexUrl',
-            name: 'SubcategoryService',
-          );
+      for (final lecture in lectures) {
+        final sheikhId = lecture['sheikhId'] as String?;
+        if (sheikhId != null && !sheikhIds.containsKey(sheikhId)) {
+          sheikhIds[sheikhId] = {
+            'id': sheikhId,
+            'sheikhId': sheikhId,
+            'sheikhName': lecture['sheikhName'] ?? 'غير محدد',
+            'enabled': true,
+          };
         }
-
-        throw SubcategoryServiceException(
-          'يتطلب هذا الاستعلام إنشاء فهرس في قاعدة البيانات. يرجى إنشاء الفهرس والمحاولة مرة أخرى.',
-          indexUrl: indexUrl,
-          needsIndex: true,
-        );
       }
-      throw SubcategoryServiceException(
-        'فشل في تحميل مشايخ الباب: ${e.message}',
-      );
+
+      return sheikhIds.values.toList();
     } catch (e) {
+      developer.log('Error listing sheikhs: $e', name: 'SubcategoryService');
       throw SubcategoryServiceException('فشل في تحميل مشايخ الباب: $e');
     }
   }
 
   // List chapters for a specific sheikh in a subcategory
+  // Note: In SQLite, chapters are stored in the lectures table or a separate chapters table
   Future<List<Map<String, dynamic>>> listChapters(
     String subcatId,
     String sheikhUid,
   ) async {
     try {
-      final snapshot = await _firestore
-          .collection('subcategories')
-          .doc(subcatId)
-          .collection('sheikhs')
-          .doc(sheikhUid)
-          .collection('chapters')
-          .orderBy('order', descending: false)
-          .get();
-
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return data;
-      }).toList();
-    } on FirebaseException catch (e) {
-      if (e.code == 'failed-precondition' && e.message != null) {
-        final message = e.message ?? 'Unknown error';
-        String? indexUrl;
-
-        final urlMatch = RegExp(
-          r'https://console\.firebase\.google\.com[^\s]+',
-        ).firstMatch(message);
-        if (urlMatch != null) {
-          indexUrl = urlMatch.group(0);
-          developer.log(
-            'Firestore Index Required for Chapters Query',
-            name: 'SubcategoryService',
-            error: 'Missing index',
-          );
-          developer.log(
-            'Create index at: $indexUrl',
-            name: 'SubcategoryService',
-          );
-        }
-
-        throw SubcategoryServiceException(
-          'يتطلب هذا الاستعلام إنشاء فهرس في قاعدة البيانات. يرجى إنشاء الفهرس والمحاولة مرة أخرى.',
-          indexUrl: indexUrl,
-          needsIndex: true,
-        );
-      }
-      throw SubcategoryServiceException('فشل في تحميل الأبواب: ${e.message}');
+      // For offline-only: Return empty list (chapters not yet implemented in LocalRepository)
+      // TODO: Implement chapters table in LocalRepository
+      return [];
     } catch (e) {
       throw SubcategoryServiceException('فشل في تحميل الأبواب: $e');
     }
@@ -133,50 +70,9 @@ class SubcategoryService {
     String chapterId,
   ) async {
     try {
-      final snapshot = await _firestore
-          .collection('subcategories')
-          .doc(subcatId)
-          .collection('sheikhs')
-          .doc(sheikhUid)
-          .collection('chapters')
-          .doc(chapterId)
-          .collection('lessons')
-          .orderBy('order', descending: false)
-          .get();
-
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return data;
-      }).toList();
-    } on FirebaseException catch (e) {
-      if (e.code == 'failed-precondition' && e.message != null) {
-        final message = e.message ?? 'Unknown error';
-        String? indexUrl;
-
-        final urlMatch = RegExp(
-          r'https://console\.firebase\.google\.com[^\s]+',
-        ).firstMatch(message);
-        if (urlMatch != null) {
-          indexUrl = urlMatch.group(0);
-          developer.log(
-            'Firestore Index Required for Lessons Query',
-            name: 'SubcategoryService',
-            error: 'Missing index',
-          );
-          developer.log(
-            'Create index at: $indexUrl',
-            name: 'SubcategoryService',
-          );
-        }
-
-        throw SubcategoryServiceException(
-          'يتطلب هذا الاستعلام إنشاء فهرس في قاعدة البيانات. يرجى إنشاء الفهرس والمحاولة مرة أخرى.',
-          indexUrl: indexUrl,
-          needsIndex: true,
-        );
-      }
-      throw SubcategoryServiceException('فشل في تحميل الدروس: ${e.message}');
+      // For offline-only: Return empty list (lessons not yet implemented in LocalRepository)
+      // TODO: Implement lessons table in LocalRepository
+      return [];
     } catch (e) {
       throw SubcategoryServiceException('فشل في تحميل الدروس: $e');
     }
@@ -197,28 +93,12 @@ class SubcategoryService {
     }
 
     try {
-      final docRef = await _firestore
-          .collection('subcategories')
-          .doc(subcatId)
-          .collection('sheikhs')
-          .doc(sheikhUid)
-          .collection('chapters')
-          .add({
-            'title': chapterData['title'],
-            'order': chapterData['order'] ?? 0,
-            'createdAt': FieldValue.serverTimestamp(),
-            'createdBy': currentUid,
-            'sheikhUid': sheikhUid, // Force sheikhUid field
-            'category': subcatId, // Force category field
-            'sheikhName': chapterData['sheikhName'],
-            'scheduledAt': chapterData['scheduledAt'],
-            'details': chapterData['details'],
-            'status': chapterData['status'] ?? 'draft',
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-
-      return docRef.id;
+      // TODO: Implement chapter creation in LocalRepository
+      throw SubcategoryServiceException(
+        'إنشاء الأبواب غير مدعوم حالياً في الوضع المحلي',
+      );
     } catch (e) {
+      if (e is SubcategoryServiceException) rethrow;
       throw SubcategoryServiceException('فشل في إضافة الباب: $e');
     }
   }
@@ -239,26 +119,12 @@ class SubcategoryService {
     }
 
     try {
-      final docRef = await _firestore
-          .collection('subcategories')
-          .doc(subcatId)
-          .collection('sheikhs')
-          .doc(sheikhUid)
-          .collection('chapters')
-          .doc(chapterId)
-          .collection('lessons')
-          .add({
-            'title': lessonData['title'],
-            'description': lessonData['description'] ?? '',
-            'mediaUrl': lessonData['mediaUrl'],
-            'duration': lessonData['duration'],
-            'order': lessonData['order'] ?? 0,
-            'createdAt': FieldValue.serverTimestamp(),
-            'createdBy': currentUid,
-          });
-
-      return docRef.id;
+      // TODO: Implement lesson creation in LocalRepository
+      throw SubcategoryServiceException(
+        'إنشاء الدروس غير مدعوم حالياً في الوضع المحلي',
+      );
     } catch (e) {
+      if (e is SubcategoryServiceException) rethrow;
       throw SubcategoryServiceException('فشل في إضافة الدرس: $e');
     }
   }
@@ -266,15 +132,14 @@ class SubcategoryService {
   // Check if a sheikh is assigned to a subcategory
   Future<bool> isSheikhAssigned(String subcatId, String sheikhUid) async {
     try {
-      final doc = await _firestore
-          .collection('subcategories')
-          .doc(subcatId)
-          .collection('sheikhs')
-          .doc(sheikhUid)
-          .get();
-
-      return doc.exists && (doc.data()?['enabled'] == true);
+      // For offline-only: Check if sheikh has lectures in this subcategory
+      final lectures = await _repository.getLecturesBySubcategory(subcatId);
+      return lectures.any((lecture) => lecture['sheikhId'] == sheikhUid);
     } catch (e) {
+      developer.log(
+        'Error checking sheikh assignment: $e',
+        name: 'SubcategoryService',
+      );
       return false;
     }
   }
@@ -284,29 +149,23 @@ class SubcategoryService {
     String sheikhUid,
   ) async {
     try {
-      // Use collectionGroup to find all sheikh assignments
-      final snapshot = await _firestore
-          .collectionGroup('sheikhs')
-          .where('sheikhUid', isEqualTo: sheikhUid)
-          .where('enabled', isEqualTo: true)
-          .get();
+      // For offline-only: Get unique subcategories from sheikh's lectures
+      final lectures = await _repository.getLecturesBySheikh(sheikhUid);
+      final subcatIds = <String>{};
+      final subcategories = <Map<String, dynamic>>[];
 
-      final assignments = <Map<String, dynamic>>[];
-
-      for (final doc in snapshot.docs) {
-        // Get parent subcategory document
-        final subcatRef = doc.reference.parent.parent;
-        if (subcatRef != null) {
-          final subcatDoc = await subcatRef.get();
-          if (subcatDoc.exists) {
-            final data = subcatDoc.data() as Map<String, dynamic>;
-            data['id'] = subcatDoc.id;
-            assignments.add(data);
+      for (final lecture in lectures) {
+        final subcatId = lecture['subcategory_id'] as String?;
+        if (subcatId != null && !subcatIds.contains(subcatId)) {
+          subcatIds.add(subcatId);
+          final subcat = await _repository.getSubcategory(subcatId);
+          if (subcat != null) {
+            subcategories.add(subcat);
           }
         }
       }
 
-      return assignments;
+      return subcategories;
     } catch (e) {
       developer.log(
         'Error listing assigned subcategories',
@@ -327,32 +186,14 @@ class SubcategoryService {
         return [];
       }
 
-      // Query subcategories where category is in allowedCategories
-      final snapshot = await _firestore
-          .collection('subcategories')
-          .where('category', whereIn: allowedCategories)
-          .get();
+      // Get all assigned subcategories and filter by allowed categories
+      final assigned = await listAssignedSubcategories(sheikhUid);
 
-      final subcategories = <Map<String, dynamic>>[];
-
-      for (final doc in snapshot.docs) {
-        // Check if this sheikh is assigned to this subcategory
-        final sheikhAssignment = await _firestore
-            .collection('subcategories')
-            .doc(doc.id)
-            .collection('sheikhs')
-            .doc(sheikhUid)
-            .get();
-
-        if (sheikhAssignment.exists &&
-            (sheikhAssignment.data()?['enabled'] == true)) {
-          final data = doc.data();
-          data['id'] = doc.id;
-          subcategories.add(data);
-        }
-      }
-
-      return subcategories;
+      // Filter by section (which maps to category in our schema)
+      return assigned.where((subcat) {
+        final section = subcat['section'] as String?;
+        return section != null && allowedCategories.contains(section);
+      }).toList();
     } catch (e) {
       developer.log(
         'Error listing allowed subcategories',
@@ -376,19 +217,12 @@ class SubcategoryService {
     }
 
     try {
-      await _firestore
-          .collection('subcategories')
-          .doc(subcatId)
-          .collection('sheikhs')
-          .doc(sheikhUid)
-          .collection('chapters')
-          .doc(chapterId)
-          .update({
-            'title': chapterData['title'],
-            'order': chapterData['order'] ?? 0,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
+      // TODO: Implement chapter update in LocalRepository
+      throw SubcategoryServiceException(
+        'تحديث الأبواب غير مدعوم حالياً في الوضع المحلي',
+      );
     } catch (e) {
+      if (e is SubcategoryServiceException) rethrow;
       throw SubcategoryServiceException('فشل في تحديث الباب: $e');
     }
   }
@@ -405,31 +239,12 @@ class SubcategoryService {
     }
 
     try {
-      // Delete all lessons first
-      final lessonsSnapshot = await _firestore
-          .collection('subcategories')
-          .doc(subcatId)
-          .collection('sheikhs')
-          .doc(sheikhUid)
-          .collection('chapters')
-          .doc(chapterId)
-          .collection('lessons')
-          .get();
-
-      for (final lessonDoc in lessonsSnapshot.docs) {
-        await lessonDoc.reference.delete();
-      }
-
-      // Delete the chapter
-      await _firestore
-          .collection('subcategories')
-          .doc(subcatId)
-          .collection('sheikhs')
-          .doc(sheikhUid)
-          .collection('chapters')
-          .doc(chapterId)
-          .delete();
+      // TODO: Implement chapter deletion in LocalRepository
+      throw SubcategoryServiceException(
+        'حذف الأبواب غير مدعوم حالياً في الوضع المحلي',
+      );
     } catch (e) {
+      if (e is SubcategoryServiceException) rethrow;
       throw SubcategoryServiceException('فشل في حذف الباب: $e');
     }
   }

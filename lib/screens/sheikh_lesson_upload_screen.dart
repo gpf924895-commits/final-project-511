@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:new_project/provider/pro_login.dart';
 import 'package:new_project/services/subcategory_service.dart';
 import 'package:new_project/widgets/sheikh_lesson_form.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SheikhLessonUploadScreen extends StatefulWidget {
   const SheikhLessonUploadScreen({super.key});
@@ -15,7 +14,7 @@ class SheikhLessonUploadScreen extends StatefulWidget {
 
 class _SheikhLessonUploadScreenState extends State<SheikhLessonUploadScreen> {
   final SubcategoryService _subcategoryService = SubcategoryService();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // Removed FirebaseFirestore - use LocalRepository via services
   List<Map<String, dynamic>> _assignedSubcategories = [];
   bool _isLoading = true;
 
@@ -76,44 +75,16 @@ class _SheikhLessonUploadScreenState extends State<SheikhLessonUploadScreen> {
     }
 
     try {
-      await _firestore
-          .collection('subcategories')
-          .doc(subcatId)
-          .collection('sheikhs')
-          .doc(sheikhUid)
-          .collection('chapters')
-          .doc(chapterId)
-          .collection('lessons')
-          .add({
-            'title': data['title'],
-            'sheikhName': data['sheikhName'],
-            'abstract': data['abstract'],
-            'tags': data['tags'],
-            'scheduledAt': data['scheduledAt'],
-            'recordedAt': data['recordedAt'],
-            'publishAt': data['publishAt'],
-            'publishedAt':
-                data['status'] == 'published' && data['publishAt'] == null
-                ? FieldValue.serverTimestamp()
-                : data['publishedAt'],
-            'status': data['status'],
-            'mediaUrl': data['mediaUrl'],
-            'mediaType': data['mediaType'],
-            'mediaSize': data['mediaSize'],
-            'mediaDuration': data['mediaDuration'],
-            'storagePath': data['storagePath'],
-            'order': 0,
-            'createdAt': FieldValue.serverTimestamp(),
-            'createdBy': sheikhUid,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-
+      // TODO: Implement lesson creation in LocalRepository
+      // For now, show message that this feature is not yet supported
       if (mounted) {
-        Navigator.pop(context, true); // Return success
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('تم حفظ الدرس')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('إنشاء الدروس غير مدعوم حالياً في الوضع المحلي'),
+          ),
+        );
       }
+      // Navigator.pop(context, false); // Return failure for now
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(

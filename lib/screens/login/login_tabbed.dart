@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:new_project/provider/pro_login.dart' as auth_provider;
 import 'package:new_project/screens/home_page.dart';
 import 'dart:async';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:new_project/offline/firestore_shims.dart';
 
 class LoginTabbedScreen extends StatefulWidget {
   const LoginTabbedScreen({super.key});
@@ -369,8 +369,7 @@ class _LoginTabbedScreenState extends State<LoginTabbedScreen>
                 prefixIcon: Icon(Icons.badge),
                 border: OutlineInputBorder(),
                 hintText: '12345678',
-                helperText:
-                    'يجب إدخال 8 أرقام بالضبط',
+                helperText: 'يجب إدخال 8 أرقام بالضبط',
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {

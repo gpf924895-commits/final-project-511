@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../provider/sheikh_provider.dart';
 import '../provider/pro_login.dart';
 import '../provider/chapter_provider.dart';
@@ -352,11 +351,9 @@ class _SheikhChaptersScreenState extends State<SheikhChaptersScreen> {
 
   Future<int> _getLessonCount(String chapterId) async {
     try {
-      final query = await FirebaseFirestore.instance
-          .collection('lectures')
-          .where('chapterId', isEqualTo: chapterId)
-          .get();
-      return query.docs.length;
+      // TODO: Implement lesson count in LocalRepository
+      // For now, return 0
+      return 0;
     } catch (e) {
       return 0;
     }

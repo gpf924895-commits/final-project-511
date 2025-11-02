@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
 import 'package:new_project/screens/splash_auth_gate.dart';
 import 'package:new_project/screens/login/login_tabbed.dart';
 import 'package:new_project/screens/register_page.dart';
@@ -20,21 +18,30 @@ import 'package:new_project/provider/prayer_times_provider.dart';
 import 'package:new_project/provider/sheikh_provider.dart';
 import 'package:new_project/provider/chapter_provider.dart';
 import 'package:new_project/provider/hierarchy_provider.dart';
-import 'package:new_project/database/firebase_service.dart';
+import 'package:new_project/database/local_sqlite_service.dart';
+import 'package:new_project/repository/local_repository.dart';
+import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
+import 'dart:developer' as developer;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load bundled SQLite with FTS5 support (Android)
+  try {
+    await applyWorkaroundToOpenSqlite3OnOldAndroidVersions();
+    developer.log('[SQLite] Bundled SQLite library loaded');
+  } catch (e) {
+    developer.log('[SQLite] Could not load bundled SQLite: $e');
+    // Continue - will fall back to device SQLite
+  }
 
   // Enable full error reporting
   FlutterError.onError = (details) {
     FlutterError.dumpErrorToConsole(details);
   };
 
-  // تهيئة Firebase
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // تهيئة قاعدة البيانات وإنشاء حساب مشرف افتراضي
-  await _initializeFirebase();
+  // Initialize local SQLite database
+  await _initializeLocalDatabase();
 
   runApp(
     MultiProvider(
@@ -53,24 +60,66 @@ void main() async {
   );
 }
 
-// تهيئة Firebase وإنشاء حساب مشرف افتراضي
-Future<void> _initializeFirebase() async {
+// Initialize local SQLite database (offline-only)
+Future<void> _initializeLocalDatabase() async {
   try {
-    final firebaseService = FirebaseService();
+    developer.log('[DB] Initializing local SQLite database...');
 
-    // تهيئة الفئات الفرعية الافتراضية
-    await firebaseService.initializeDefaultSubcategories();
+    // Open/create database
+    final sqliteService = LocalSQLiteService();
+    final db = await sqliteService.db;
 
-    // محاولة إنشاء حساب مشرف افتراضي للاختبار
-    // username: admin, password: admin123
-    await firebaseService.createAdminAccount(
-      username: 'admin',
-      email: 'admin@admin.com',
-      password: 'admin123',
+    // Log database path
+    final dbPath = await sqliteService.getDatabasePath();
+    developer.log('[DB] path: $dbPath');
+    developer.log('[DB] schema version: 2');
+
+    // Verify SQLite version and compile options
+    try {
+      final versionResult = await db.rawQuery(
+        'SELECT sqlite_version() as version',
+      );
+      final sqliteVersion =
+          versionResult.first['version'] as String? ?? 'unknown';
+      developer.log('[DB] SQLite version: $sqliteVersion');
+
+      final compileOptsResult = await db.rawQuery('PRAGMA compile_options');
+      final compileOpts = compileOptsResult
+          .map((row) => row['compile_options'] as String? ?? '')
+          .toList()
+          .join(', ');
+      developer.log('[DB] Compile options: $compileOpts');
+      if (compileOpts.contains('FTS5')) {
+        developer.log('[DB] ✅ FTS5 support detected');
+      } else {
+        developer.log(
+          '[DB] ⚠️ FTS5 not in compile options - will use fallback',
+        );
+      }
+    } catch (e) {
+      developer.log('[DB] Could not query SQLite info: $e');
+    }
+
+    // Initialize repository
+    final repository = LocalRepository();
+
+    // Initialize default subcategories
+    await repository.initializeDefaultSubcategoriesIfEmpty();
+
+    // Create default admin account if none exists
+    await repository.ensureDefaultAdmin();
+    developer.log('[DB] Default admin account ensured');
+
+    // Log row counts
+    final counts = await repository.getTableCounts();
+    developer.log(
+      '[DB] users: ${counts['users']} | subcategories: ${counts['subcategories']} | lectures: ${counts['lectures']}',
     );
+
+    developer.log('[DB] Initialization completed');
   } catch (e) {
-    debugPrint('Firebase initialization error: $e');
-    // Continue with app initialization even if Firebase setup fails
+    developer.log('[DB] Initialization error: $e', name: 'main');
+    // Continue with app initialization even if DB setup fails
   }
 }
 

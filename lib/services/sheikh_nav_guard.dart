@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:new_project/repository/local_repository.dart';
 
 class SheikhAuthGuard {
-  // Validate credentials stored locally or via a quick Firestore check.
-  // This function must return true only when Sheikh is confirmed.
-  // It expects the app to save sheikhId & sheikhEmail on a successful login.
+  // _repository not needed - static methods use LocalRepository() directly
+
+  // Validate credentials stored locally
+  // This function returns true only when Sheikh is confirmed
   static Future<bool> validateCurrentSheikh(BuildContext context) async {
     try {
-      // check locally first
+      // Check locally first
       final prefs = await SharedPreferences.getInstance();
       final storedId = prefs.getString('sheikhId') ?? '';
       final storedEmail = prefs.getString('sheikhEmail') ?? '';
@@ -18,18 +19,17 @@ class SheikhAuthGuard {
         return false;
       }
 
-      // Verify Firestore record still exists and matches cached id/email
-      final q = await FirebaseFirestore.instance
-          .collection('sheikhs')
-          .where('sheikhId', isEqualTo: storedId)
-          .limit(1)
-          .get();
+      // Verify in LocalRepository
+      final repository = LocalRepository();
+      final sheikh = await repository.getUserByUniqueId(
+        storedId,
+        role: 'sheikh',
+      );
 
-      if (q.docs.isEmpty) return false;
-      final data = q.docs.first.data();
+      if (sheikh == null) return false;
+      final data = sheikh;
       if ((data['email'] ?? '').toString() != storedEmail) return false;
 
-      // Additional sanity: ensure createdBy/uid match if you use uid linking
       return true;
     } catch (e) {
       // On any error, return false (do not allow navigation)
@@ -47,9 +47,9 @@ class SheikhAuthGuard {
       await navigate();
       return true;
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("الرجاء تسجيل دخول الشيخ أولاً")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('الرجاء تسجيل دخول الشيخ أولاً')),
+      );
       // Optionally route to sheikh login:
       Navigator.pushReplacementNamed(context, '/sheikhLogin');
       return false;

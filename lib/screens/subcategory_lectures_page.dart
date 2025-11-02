@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:new_project/offline/firestore_shims.dart';
 import 'package:new_project/provider/lecture_provider.dart';
 import '../widgets/app_drawer.dart';
 
@@ -21,7 +21,8 @@ class SubcategoryLecturesPage extends StatefulWidget {
   });
 
   @override
-  State<SubcategoryLecturesPage> createState() => _SubcategoryLecturesPageState();
+  State<SubcategoryLecturesPage> createState() =>
+      _SubcategoryLecturesPageState();
 }
 
 class _SubcategoryLecturesPageState extends State<SubcategoryLecturesPage> {
@@ -40,8 +41,13 @@ class _SubcategoryLecturesPageState extends State<SubcategoryLecturesPage> {
       _isLoading = true;
     });
 
-    final lectureProvider = Provider.of<LectureProvider>(context, listen: false);
-    final lectures = await lectureProvider.loadLecturesBySubcategory(widget.subcategoryId);
+    final lectureProvider = Provider.of<LectureProvider>(
+      context,
+      listen: false,
+    );
+    final lectures = await lectureProvider.loadLecturesBySubcategory(
+      widget.subcategoryId,
+    );
 
     setState(() {
       _lectures = lectures;
@@ -52,7 +58,9 @@ class _SubcategoryLecturesPageState extends State<SubcategoryLecturesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: widget.isDarkMode ? const Color(0xFF121212) : const Color(0xFFE4E5D3),
+      backgroundColor: widget.isDarkMode
+          ? const Color(0xFF121212)
+          : const Color(0xFFE4E5D3),
       appBar: AppBar(
         title: Text(widget.subcategoryName),
         centerTitle: true,
@@ -62,10 +70,7 @@ class _SubcategoryLecturesPageState extends State<SubcategoryLecturesPage> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadLectures,
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadLectures),
           if (widget.toggleTheme != null)
             Builder(
               builder: (context) => IconButton(
@@ -75,95 +80,114 @@ class _SubcategoryLecturesPageState extends State<SubcategoryLecturesPage> {
             ),
         ],
       ),
-      drawer: widget.toggleTheme != null ? AppDrawer(toggleTheme: widget.toggleTheme!) : null,
+      drawer: widget.toggleTheme != null
+          ? AppDrawer(toggleTheme: widget.toggleTheme!)
+          : null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _lectures.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.library_books, size: 80, color: Colors.grey[400]),
-                      const SizedBox(height: 16),
-                      Text(
-                        'لا توجد محاضرات في هذه الفئة',
-                        style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.library_books, size: 80, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'لا توجد محاضرات في هذه الفئة',
+                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
                   ),
-                )
-              : Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: ListView.builder(
-                    itemCount: _lectures.length,
-                    itemBuilder: (context, index) {
-                      final lecture = _lectures[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                ],
+              ),
+            )
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ListView.builder(
+                itemCount: _lectures.length,
+                itemBuilder: (context, index) {
+                  final lecture = _lectures[index];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    color: widget.isDarkMode
+                        ? const Color(0xFF1E1E1E)
+                        : Colors.white,
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(16),
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.green,
+                        radius: 30,
+                        child: Icon(
+                          _getSectionIcon(widget.section),
+                          color: Colors.white,
+                          size: 30,
                         ),
-                        color: widget.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.all(16),
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.green,
-                            radius: 30,
-                            child: Icon(
-                              _getSectionIcon(widget.section),
-                              color: Colors.white,
-                              size: 30,
-                            ),
+                      ),
+                      title: Text(
+                        lecture['title'],
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 8),
+                          Text(
+                            lecture['description'],
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          title: Text(
-                            lecture['title'],
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          const SizedBox(height: 4),
+                          Row(
                             children: [
-                              const SizedBox(height: 8),
-                              Text(
-                                lecture['description'],
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
+                              Icon(
+                                Icons.calendar_today,
+                                size: 12,
+                                color: Colors.grey[600],
                               ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Icon(Icons.calendar_today, size: 12, color: Colors.grey[600]),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    _formatDate(lecture['created_at']),
-                                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                                  ),
-                                ],
+                              const SizedBox(width: 4),
+                              Text(
+                                _formatDate(lecture['created_at']),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
                               ),
                             ],
                           ),
-                          trailing: lecture['video_path'] != null
-                              ? const Icon(Icons.video_library, color: Colors.green)
-                              : null,
-                          onTap: () {
-                            _showLectureDetails(context, lecture);
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                        ],
+                      ),
+                      trailing: lecture['video_path'] != null
+                          ? const Icon(Icons.video_library, color: Colors.green)
+                          : null,
+                      onTap: () {
+                        _showLectureDetails(context, lecture);
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 1,
         selectedItemColor: Colors.green,
         unselectedItemColor: Colors.grey,
-        backgroundColor: widget.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        backgroundColor: widget.isDarkMode
+            ? const Color(0xFF1E1E1E)
+            : Colors.white,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'الإشعارات'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications),
+            label: 'الإشعارات',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'الإعدادات'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'الإعدادات',
+          ),
         ],
         onTap: (index) {
           if (index == 1) {
@@ -227,7 +251,10 @@ class _SubcategoryLecturesPageState extends State<SubcategoryLecturesPage> {
               if (lecture['video_path'] != null) ...[
                 const Text(
                   'يحتوي على فيديو',
-                  style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 8),
               ],
@@ -248,4 +275,3 @@ class _SubcategoryLecturesPageState extends State<SubcategoryLecturesPage> {
     );
   }
 }
-

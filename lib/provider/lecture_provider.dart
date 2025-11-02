@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:new_project/database/firebase_service.dart';
+import 'package:new_project/repository/local_repository.dart';
 
 class LectureProvider extends ChangeNotifier {
-  final FirebaseService _firebaseService = FirebaseService();
+  final LocalRepository _repository = LocalRepository();
 
   List<Map<String, dynamic>> _allLectures = [];
   List<Map<String, dynamic>> _fiqhLectures = [];
@@ -52,7 +51,7 @@ class LectureProvider extends ChangeNotifier {
     _setError(null);
 
     try {
-      _allLectures = await _firebaseService.getAllLectures();
+      _allLectures = await _repository.getAllLectures();
       _setLoading(false);
       notifyListeners();
     } catch (e) {
@@ -67,7 +66,7 @@ class LectureProvider extends ChangeNotifier {
     _setError(null);
 
     try {
-      final lectures = await _firebaseService.getLecturesBySection(section);
+      final lectures = await _repository.getLecturesBySection(section);
 
       switch (section) {
         case 'الفقه':
@@ -98,11 +97,11 @@ class LectureProvider extends ChangeNotifier {
     _setError(null);
 
     try {
-      _allLectures = await _firebaseService.getAllLectures();
-      _fiqhLectures = await _firebaseService.getLecturesBySection('الفقه');
-      _hadithLectures = await _firebaseService.getLecturesBySection('الحديث');
-      _tafsirLectures = await _firebaseService.getLecturesBySection('التفسير');
-      _seerahLectures = await _firebaseService.getLecturesBySection('السيرة');
+      _allLectures = await _repository.getAllLectures();
+      _fiqhLectures = await _repository.getLecturesBySection('الفقه');
+      _hadithLectures = await _repository.getLecturesBySection('الحديث');
+      _tafsirLectures = await _repository.getLecturesBySection('التفسير');
+      _seerahLectures = await _repository.getLecturesBySection('السيرة');
 
       _setLoading(false);
       notifyListeners();
@@ -120,7 +119,7 @@ class LectureProvider extends ChangeNotifier {
     _setError(null);
 
     try {
-      final lectures = await _firebaseService.getLecturesBySubcategory(
+      final lectures = await _repository.getLecturesBySubcategory(
         subcategoryId,
       );
       _setLoading(false);
@@ -144,7 +143,7 @@ class LectureProvider extends ChangeNotifier {
     _setError(null);
 
     try {
-      final result = await _firebaseService.addLecture(
+      final result = await _repository.addLecture(
         title: title,
         description: description,
         videoPath: videoPath,
@@ -183,7 +182,7 @@ class LectureProvider extends ChangeNotifier {
     _setError(null);
 
     try {
-      final result = await _firebaseService.updateLecture(
+      final result = await _repository.updateLecture(
         id: id,
         title: title,
         description: description,
@@ -216,7 +215,7 @@ class LectureProvider extends ChangeNotifier {
     _setError(null);
 
     try {
-      final success = await _firebaseService.deleteLecture(lectureId);
+      final success = await _repository.deleteLecture(lectureId);
 
       if (success) {
         // Reload the specific section and all lectures
@@ -239,7 +238,7 @@ class LectureProvider extends ChangeNotifier {
   // Search lectures
   Future<List<Map<String, dynamic>>> searchLectures(String query) async {
     try {
-      return await _firebaseService.searchLectures(query);
+      return await _repository.searchLectures(query);
     } catch (e) {
       _setError('حدث خطأ في البحث: $e');
       return [];
@@ -277,7 +276,7 @@ class LectureProvider extends ChangeNotifier {
     _setError(null);
 
     try {
-      _sheikhLectures = await _firebaseService.getLecturesBySheikh(sheikhId);
+      _sheikhLectures = await _repository.getLecturesBySheikh(sheikhId);
       _setLoading(false);
       notifyListeners();
     } catch (e) {
@@ -289,7 +288,7 @@ class LectureProvider extends ChangeNotifier {
   // Load sheikh lecture statistics
   Future<void> loadSheikhStats(String sheikhId) async {
     try {
-      _sheikhStats = await _firebaseService.getSheikhLectureStats(sheikhId);
+      _sheikhStats = await _repository.getSheikhLectureStats(sheikhId);
       notifyListeners();
     } catch (e) {
       print('Error loading sheikh stats: $e');
@@ -317,10 +316,13 @@ class LectureProvider extends ChangeNotifier {
 
     try {
       // Check for overlapping lectures
-      final hasOverlap = await _firebaseService.hasOverlappingLectures(
+      final startTimeMillis = startTime.toUtc().millisecondsSinceEpoch;
+      final endTimeMillis = endTime?.toUtc().millisecondsSinceEpoch;
+
+      final hasOverlap = await _repository.hasOverlappingLectures(
         sheikhId: sheikhId,
-        startTime: Timestamp.fromDate(startTime),
-        endTime: endTime != null ? Timestamp.fromDate(endTime) : null,
+        startTime: startTimeMillis,
+        endTime: endTimeMillis,
       );
 
       if (hasOverlap) {
@@ -329,7 +331,7 @@ class LectureProvider extends ChangeNotifier {
         return false;
       }
 
-      final result = await _firebaseService.addSheikhLecture(
+      final result = await _repository.addSheikhLecture(
         sheikhId: sheikhId,
         sheikhName: sheikhName,
         section: section,
@@ -339,8 +341,8 @@ class LectureProvider extends ChangeNotifier {
         subcategoryName: subcategoryName,
         title: title,
         description: description,
-        startTime: Timestamp.fromDate(startTime),
-        endTime: endTime != null ? Timestamp.fromDate(endTime) : null,
+        startTime: startTimeMillis,
+        endTime: endTimeMillis,
         location: location,
         media: media,
       );
@@ -379,10 +381,13 @@ class LectureProvider extends ChangeNotifier {
 
     try {
       // Check for overlapping lectures (excluding current lecture)
-      final hasOverlap = await _firebaseService.hasOverlappingLectures(
+      final startTimeMillis = startTime.toUtc().millisecondsSinceEpoch;
+      final endTimeMillis = endTime?.toUtc().millisecondsSinceEpoch;
+
+      final hasOverlap = await _repository.hasOverlappingLectures(
         sheikhId: sheikhId,
-        startTime: Timestamp.fromDate(startTime),
-        endTime: endTime != null ? Timestamp.fromDate(endTime) : null,
+        startTime: startTimeMillis,
+        endTime: endTimeMillis,
         excludeLectureId: lectureId,
       );
 
@@ -392,13 +397,13 @@ class LectureProvider extends ChangeNotifier {
         return false;
       }
 
-      final result = await _firebaseService.updateSheikhLecture(
+      final result = await _repository.updateSheikhLecture(
         lectureId: lectureId,
         sheikhId: sheikhId,
         title: title,
         description: description,
-        startTime: Timestamp.fromDate(startTime),
-        endTime: endTime != null ? Timestamp.fromDate(endTime) : null,
+        startTime: startTimeMillis,
+        endTime: endTimeMillis,
         location: location,
         media: media,
       );
@@ -430,7 +435,7 @@ class LectureProvider extends ChangeNotifier {
     _setError(null);
 
     try {
-      final result = await _firebaseService.archiveSheikhLecture(
+      final result = await _repository.archiveSheikhLecture(
         lectureId: lectureId,
         sheikhId: sheikhId,
       );
@@ -462,7 +467,7 @@ class LectureProvider extends ChangeNotifier {
     _setError(null);
 
     try {
-      final result = await _firebaseService.deleteSheikhLecture(
+      final result = await _repository.deleteSheikhLecture(
         lectureId: lectureId,
         sheikhId: sheikhId,
       );
@@ -494,7 +499,7 @@ class LectureProvider extends ChangeNotifier {
     _setError(null);
 
     try {
-      final lectures = await _firebaseService.getLecturesBySheikhAndCategory(
+      final lectures = await _repository.getLecturesBySheikhAndCategory(
         sheikhId,
         categoryKey,
       );

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ChapterProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _chapters = [];
@@ -16,18 +15,9 @@ class ChapterProvider extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      final query = await FirebaseFirestore.instance
-          .collection('chapters')
-          .where('categoryId', isEqualTo: categoryId)
-          .where('sheikhUid', isEqualTo: sheikhUid)
-          .orderBy('createdAt', descending: true)
-          .get();
-
-      _chapters = query.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return data;
-      }).toList();
+      // TODO: Implement chapter loading from LocalRepository
+      // For now, return empty list
+      _chapters = [];
     } catch (e) {
       _error = 'خطأ في تحميل الأبواب: $e';
     } finally {
@@ -45,26 +35,10 @@ class ChapterProvider extends ChangeNotifier {
     String status = 'draft',
   }) async {
     try {
-      final now = DateTime.now();
-      final chapterData = {
-        'title': title,
-        'details': details ?? '',
-        'categoryId': categoryId,
-        'sheikhUid': sheikhUid,
-        'createdBy': sheikhUid,
-        'status': status,
-        'createdAt': Timestamp.fromDate(now),
-        'updatedAt': Timestamp.fromDate(now),
-        if (scheduledAt != null) 'scheduledAt': Timestamp.fromDate(scheduledAt),
-      };
-
-      final docRef = await FirebaseFirestore.instance
-          .collection('chapters')
-          .add(chapterData);
-
-      // Reload chapters
+      // TODO: Implement chapter creation in LocalRepository
+      // For now, return null
       await loadChapters(categoryId, sheikhUid);
-      return docRef.id;
+      return null;
     } catch (e) {
       _error = 'خطأ في إضافة الباب: $e';
       notifyListeners();
@@ -80,25 +54,17 @@ class ChapterProvider extends ChangeNotifier {
     String? status,
   }) async {
     try {
-      final updateData = {
-        'title': title,
-        'updatedAt': Timestamp.fromDate(DateTime.now()),
-        if (details != null) 'details': details,
-        if (scheduledAt != null) 'scheduledAt': Timestamp.fromDate(scheduledAt),
-        if (status != null) 'status': status,
-      };
-
-      await FirebaseFirestore.instance
-          .collection('chapters')
-          .doc(chapterId)
-          .update(updateData);
-
-      // Update local list
+      // TODO: Implement chapter update in LocalRepository
+      // For now, just update local list
       final index = _chapters.indexWhere(
         (chapter) => chapter['id'] == chapterId,
       );
       if (index != -1) {
-        _chapters[index].addAll(updateData);
+        _chapters[index]['title'] = title;
+        if (details != null) _chapters[index]['details'] = details;
+        if (scheduledAt != null)
+          _chapters[index]['scheduledAt'] = scheduledAt.millisecondsSinceEpoch;
+        if (status != null) _chapters[index]['status'] = status;
         notifyListeners();
       }
       return true;
@@ -115,24 +81,9 @@ class ChapterProvider extends ChangeNotifier {
     String sheikhUid,
   ) async {
     try {
-      // First, get all lessons in this chapter
-      final lessonsQuery = await FirebaseFirestore.instance
-          .collection('lectures')
-          .where('chapterId', isEqualTo: chapterId)
-          .get();
-
-      // Delete all lessons in this chapter
-      final batch = FirebaseFirestore.instance.batch();
-      for (final lesson in lessonsQuery.docs) {
-        batch.delete(lesson.reference);
-      }
-
-      // Delete the chapter
-      batch.delete(
-        FirebaseFirestore.instance.collection('chapters').doc(chapterId),
-      );
-
-      await batch.commit();
+      // TODO: Implement chapter deletion in LocalRepository
+      // For now, just remove from local list
+      _chapters.removeWhere((ch) => ch['id'] == chapterId);
 
       // Reload chapters
       await loadChapters(categoryId, sheikhUid);
@@ -145,15 +96,8 @@ class ChapterProvider extends ChangeNotifier {
   }
 
   Future<int> getLessonCount(String chapterId) async {
-    try {
-      final query = await FirebaseFirestore.instance
-          .collection('lectures')
-          .where('chapterId', isEqualTo: chapterId)
-          .get();
-      return query.docs.length;
-    } catch (e) {
-      return 0;
-    }
+    // TODO: Implement lesson count from LocalRepository
+    return 0;
   }
 
   void clearData() {
