@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:new_project/provider/pro_login.dart';
 import 'package:new_project/provider/lecture_provider.dart';
-import 'package:new_project/screens/sheikh/sheikh_home_page.dart';
 import 'package:new_project/widgets/sheikh_guard.dart';
-import 'package:new_project/offline/firestore_shims.dart';
+import 'package:new_project/utils/date_converter.dart';
 
 class EditLecturePage extends StatefulWidget {
   const EditLecturePage({super.key});
@@ -158,7 +157,8 @@ class _EditLecturePageState extends State<EditLecturePage> {
   Widget _buildLectureCard(Map<String, dynamic> lecture) {
     final title = lecture['title'] ?? 'بدون عنوان';
     final categoryName = lecture['categoryNameAr'] ?? '';
-    final startTime = lecture['startTime'] as Timestamp?;
+    // Use safe date conversion - handles Timestamp, int (epoch ms), String, DateTime
+    final startTime = safeDateFromDynamic(lecture['startTime']);
     final status = lecture['status'] ?? 'draft';
     final description = lecture['description'] ?? '';
 
@@ -226,7 +226,7 @@ class _EditLecturePageState extends State<EditLecturePage> {
                     Icon(Icons.schedule, size: 16, color: Colors.grey[600]),
                     const SizedBox(width: 4),
                     Text(
-                      'الوقت: ${_formatDateTime(startTime.toDate())}',
+                      'الوقت: ${_formatDateTime(startTime)}',
                       style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                     ),
                   ],
@@ -347,16 +347,15 @@ class _EditLectureFormState extends State<EditLectureForm> {
       _videoUrlController.text = media['videoUrl'] ?? '';
     }
 
-    final startTime = widget.lecture['startTime'] as Timestamp?;
-    if (startTime != null) {
-      final startDateTime = startTime.toDate();
+    // Use safe date conversion - handles Timestamp, int (epoch ms), String, DateTime
+    final startDateTime = safeDateFromDynamic(widget.lecture['startTime']);
+    if (startDateTime != null) {
       _selectedStartDate = startDateTime;
       _selectedStartTime = TimeOfDay.fromDateTime(startDateTime);
     }
 
-    final endTime = widget.lecture['endTime'] as Timestamp?;
-    if (endTime != null) {
-      final endDateTime = endTime.toDate();
+    final endDateTime = safeDateFromDynamic(widget.lecture['endTime']);
+    if (endDateTime != null) {
       _selectedEndDate = endDateTime;
       _selectedEndTime = TimeOfDay.fromDateTime(endDateTime);
       _hasEndTime = true;
@@ -912,11 +911,8 @@ class _EditLectureFormState extends State<EditLectureForm> {
           backgroundColor: Colors.green,
         ),
       );
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const SheikhHomePage()),
-        (route) => false,
-      );
+      // Pop with refresh=true to trigger reload in parent screen
+      Navigator.pop(context, true);
     }
   }
 }

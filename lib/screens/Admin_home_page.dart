@@ -7,6 +7,7 @@ import 'package:new_project/screens/admin_sheikh_list_page.dart';
 import 'package:new_project/screens/home_page.dart';
 import 'package:new_project/services/sheikh_service.dart';
 import 'package:new_project/provider/pro_login.dart';
+import 'package:new_project/utils/date_converter.dart';
 import '../utils/page_transition.dart';
 
 class AdminPanelPage extends StatefulWidget {
@@ -154,9 +155,9 @@ class _AdminPanelPageState extends State<AdminPanelPage> {
             itemCount: _users.length,
             itemBuilder: (context, index) {
               final user = _users[index];
-              final createdAt = user['created_at'] is Timestamp
-                  ? (user['created_at'] as Timestamp).toDate()
-                  : DateTime.now();
+              // Use safe date conversion - handles Timestamp, int (epoch ms), String, DateTime
+              final createdAt =
+                  safeDateFromDynamic(user['created_at']) ?? DateTime.now();
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),

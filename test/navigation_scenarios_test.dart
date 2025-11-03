@@ -7,8 +7,6 @@ import 'package:new_project/screens/home_page.dart';
 import 'package:new_project/screens/sheikh/sheikh_home_page.dart';
 import 'package:new_project/screens/sheikh/sheikh_category_picker.dart';
 import 'package:new_project/screens/sheikh/add_lecture_form.dart';
-import 'package:new_project/provider/pro_login.dart';
-import 'package:new_project/provider/lecture_provider.dart';
 import 'test_setup.dart';
 
 void main() {
@@ -302,10 +300,8 @@ class MockAuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  @override
   bool get isReady => true;
 
-  @override
   bool get isAuthenticated {
     switch (_sessionType) {
       case 'none':
@@ -318,7 +314,6 @@ class MockAuthProvider extends ChangeNotifier {
     }
   }
 
-  @override
   String? get currentUid {
     switch (_sessionType) {
       case 'none':
@@ -332,7 +327,6 @@ class MockAuthProvider extends ChangeNotifier {
     }
   }
 
-  @override
   Map<String, dynamic>? get currentUser {
     switch (_sessionType) {
       case 'none':
@@ -356,7 +350,6 @@ class MockAuthProvider extends ChangeNotifier {
     }
   }
 
-  @override
   String? get currentRole {
     switch (_sessionType) {
       case 'none':
@@ -372,13 +365,10 @@ class MockAuthProvider extends ChangeNotifier {
 }
 
 class MockLectureProvider extends ChangeNotifier {
-  @override
   bool get isLoading => false;
 
-  @override
   String? get errorMessage => null;
 
-  @override
   Future<bool> addSheikhLecture({
     required String sheikhId,
     required String sheikhName,
@@ -398,7 +388,6 @@ class MockLectureProvider extends ChangeNotifier {
     return true;
   }
 
-  @override
   Future<bool> archiveSheikhLecture({
     required String lectureId,
     required String sheikhId,
@@ -406,7 +395,6 @@ class MockLectureProvider extends ChangeNotifier {
     return true;
   }
 
-  @override
   Future<bool> deleteSheikhLecture({
     required String lectureId,
     required String sheikhId,

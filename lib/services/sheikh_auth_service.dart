@@ -41,92 +41,33 @@ class SheikhAuthService {
 
       print('[SheikhAuthService] Using 8-digit sheikhId: $sheikhId8Digit');
 
-      // Find Sheikh by uniqueId using LocalRepository
-      final sheikh = await _repository.getUserByUniqueId(
-        sheikhId8Digit,
-        role: 'sheikh',
-      );
+      // Use loginSheikh method which queries sheikhs table only
+      final sheikh = await _repository.loginSheikh(sheikhId8Digit, password);
 
       if (sheikh == null) {
-        print(
-          '[SheikhAuthService] No Sheikh found for sheikhId: $sheikhId8Digit',
-        );
+        print('[SheikhAuthService] Login failed for sheikhId: $sheikhId8Digit');
         return {
           'success': false,
           'message': 'رقم الشيخ أو كلمة المرور غير صحيحة',
         };
       }
 
-      print(
-        '[SheikhAuthService] CHECK_PASSWORD: Verifying password for sheikhId: $sheikhId8Digit',
-      );
-
-      // Get user profile to verify password (password_hash is stored)
-      // Note: In SQLite, we need to hash the password and compare
-      final userProfile = await _repository.getUserProfile(
-        sheikh['id'] as String,
-      );
-      if (userProfile == null) {
-        return {'success': false, 'message': 'بيانات الشيخ غير موجودة'};
-      }
-
-      // For now, we'll need to check password through login
-      // Since LocalRepository.loginUser requires email, we'll use a workaround
-      // Check if password matches by attempting login with the user's email
-      final email = userProfile['email'] as String?;
-      if (email == null) {
-        return {'success': false, 'message': 'بيانات الشيخ غير مكتملة'};
-      }
-
-      // Try login to verify password
-      final loginResult = await _repository.loginUser(
-        email: email,
-        password: password,
-      );
-
-      if (!loginResult['success']) {
-        print(
-          '[SheikhAuthService] CHECK_PASSWORD: Password verification failed',
-        );
-        return {
-          'success': false,
-          'message': 'رقم الشيخ أو كلمة المرور غير صحيحة',
-        };
-      }
-
-      print(
-        '[SheikhAuthService] CHECK_PASSWORD: Password verification successful',
-      );
-
-      print('[SheikhAuthService] CHECK_ROLE_ACTIVE: Verifying role');
-
-      // Verify role is sheikh (already checked by getUserByUniqueId with role: 'sheikh')
-      if (userProfile['role'] != 'sheikh') {
-        print(
-          '[SheikhAuthService] CHECK_ROLE_ACTIVE: Role verification failed - role is ${userProfile['role']}',
-        );
-        return {'success': false, 'message': 'هذا الحساب ليس حساب شيخ'};
-      }
-
-      print(
-        '[SheikhAuthService] CHECK_ROLE_ACTIVE: Role verification successful',
-      );
-
-      // Success - return Sheikh data
       print(
         '[SheikhAuthService] Authentication successful for sheikhId: $sheikhId8Digit',
       );
+
+      // Success - return Sheikh data
       return {
         'success': true,
         'message': 'تم تسجيل الدخول بنجاح',
         'sheikh': {
-          'uid': userProfile['id'],
-          'name': userProfile['name'] ?? 'غير محدد',
-          'email': userProfile['email'],
+          'uid': sheikh['uid'] ?? sheikh['id'],
+          'name': sheikh['name'] ?? 'غير محدد',
+          'email': sheikh['email'],
           'uniqueId': sheikhId8Digit,
           'sheikhId': sheikhId8Digit,
           'role': 'sheikh',
-          'category': userProfile['category'] ?? '',
+          'category': sheikh['category'] ?? '',
           'isActive': true, // For offline, assume active
         },
       };

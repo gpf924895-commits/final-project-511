@@ -31,28 +31,40 @@ class _SheikhHierarchyManageScreenState
       routeName: '/sheikh/hierarchy/manage',
       child: Directionality(
         textDirection: TextDirection.rtl,
-        child: Scaffold(
-          backgroundColor: const Color(0xFFE4E5D3),
-          appBar: AppBar(
-            title: const Text('إدارة التصنيفات'),
-            backgroundColor: Colors.green,
-            foregroundColor: Colors.white,
-            centerTitle: true,
-          ),
-          body: Column(
-            children: [
-              // Section Picker
-              _buildSectionPicker(),
-              const Divider(height: 1),
-              // Content based on selection
-              Expanded(
-                child: _selectedCategoryId == null
-                    ? _buildCategoriesList()
-                    : _buildSubcategoriesList(),
+        child: PopScope(
+          canPop: false,
+          onPopInvoked: (didPop) async {
+            if (!didPop) {
+              Navigator.of(context).pop(true);
+            }
+          },
+          child: Scaffold(
+            backgroundColor: const Color(0xFFE4E5D3),
+            appBar: AppBar(
+              title: const Text('إدارة التصنيفات'),
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              centerTitle: true,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.of(context).pop(true),
               ),
-            ],
+            ),
+            body: Column(
+              children: [
+                // Section Picker
+                _buildSectionPicker(),
+                const Divider(height: 1),
+                // Content based on selection
+                Expanded(
+                  child: _selectedCategoryId == null
+                      ? _buildCategoriesList()
+                      : _buildSubcategoriesList(),
+                ),
+              ],
+            ),
+            floatingActionButton: _buildFloatingActionButton(),
           ),
-          floatingActionButton: _buildFloatingActionButton(),
         ),
       ),
     );
@@ -791,13 +803,14 @@ class _SheikhHierarchyManageScreenState
     );
 
     if (success && mounted) {
-      Navigator.pop(context);
+      Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('تم إضافة الفئة بنجاح'),
           backgroundColor: Colors.green,
         ),
       );
+      _loadCategories();
     }
   }
 
@@ -832,7 +845,7 @@ class _SheikhHierarchyManageScreenState
     );
 
     if (success && mounted) {
-      Navigator.pop(context);
+      Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('تم تحديث الفئة بنجاح'),
@@ -852,7 +865,7 @@ class _SheikhHierarchyManageScreenState
     final success = await hierarchyProvider.deleteCategory(categoryId);
 
     if (success && mounted) {
-      Navigator.pop(context);
+      Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('تم حذف الفئة بنجاح'),

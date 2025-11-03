@@ -137,7 +137,6 @@ class SheikhService {
   }
 
   /// List all sheikhs
-  /// TODO: Filter by role in LocalRepository
   Future<SheikhQueryResult> listSheikhs({
     String? search,
     String? category,
@@ -145,10 +144,12 @@ class SheikhService {
     int limit = 50,
   }) async {
     try {
-      // For offline-only: Get all users and filter by role
-      // Note: LocalRepository doesn't have role filtering yet
-      // Return empty for now - needs users table to have role field
-      return SheikhQueryResult(items: []);
+      final items = await _repository.getAllSheikhs(
+        search: search,
+        category: category,
+        limit: limit,
+      );
+      return SheikhQueryResult(items: items);
     } catch (e) {
       developer.log('Error listing sheikhs', name: 'SheikhService', error: e);
       return SheikhQueryResult(
@@ -186,19 +187,21 @@ class SheikhService {
   /// Delete sheikh (soft delete)
   Future<void> deleteSheikh(String sheikhId) async {
     try {
-      final sheikh = await _repository.getUserByUniqueId(
-        sheikhId,
-        role: 'sheikh',
-      );
-      if (sheikh == null) {
-        throw SheikhServiceException('الشيخ غير موجود');
+      // Normalize sheikhId to 8 digits
+      final normalized = sheikhId.trim().replaceAll(RegExp(r'[^0-9]'), '');
+      if (normalized.isEmpty || normalized.length != 8) {
+        throw SheikhServiceException('رقم الشيخ غير صحيح');
       }
 
-      final uid = sheikh['uid'] as String;
-      await _repository.archiveLecturesBySheikh(uid);
-      // Optionally delete user: await _repository.deleteUser(uid);
+      final result = await _repository.deleteSheikhByUniqueId(normalized);
+      if (!result['success']) {
+        throw SheikhServiceException(result['message'] ?? 'فشل في حذف الشيخ');
+      }
     } catch (e) {
       developer.log('Error deleting sheikh', name: 'SheikhService', error: e);
+      if (e is SheikhServiceException) {
+        rethrow;
+      }
       throw SheikhServiceException('فشل في حذف الشيخ: $e');
     }
   }
@@ -226,40 +229,19 @@ class SheikhService {
       // Allocate unique ID
       final uniqueId = await allocateNextSheikhId();
 
-      // Create sheikh in sheikhs table
+      // Create sheikh in sheikhs table (password will be hashed and stored in sheikhs table)
       final result = await _repository.createSheikh(
         name: name,
         email: email,
         phone: phone,
         uniqueId: uniqueId,
         category: category,
+        password:
+            password, // Password is stored in sheikhs table as passwordHash
       );
 
       if (!result['success']) {
         return result;
-      }
-
-      // If password is provided, also create a user account for login
-      if (password != null &&
-          password.isNotEmpty &&
-          email != null &&
-          email.isNotEmpty) {
-        final userResult = await _repository.registerUser(
-          username: uniqueId,
-          email: email,
-          password: password,
-        );
-
-        if (userResult['success']) {
-          // Update user to add uniqueId and role
-          final userId = userResult['user_id'] as String;
-          await _repository.updateUserRoleAndUniqueId(
-            userId: userId,
-            uniqueId: uniqueId,
-            role: 'sheikh',
-            name: name,
-          );
-        }
       }
 
       return {

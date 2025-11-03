@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:new_project/database/firebase_service.dart';
 import 'package:new_project/offline/firestore_shims.dart';
+import 'package:new_project/utils/date_converter.dart';
 
 class DeleteLecturePage extends StatefulWidget {
   final String? section;
@@ -268,12 +269,10 @@ class _DeleteLecturePageState extends State<DeleteLecturePage> {
                     itemBuilder: (context, index) {
                       final lecture = _lectures[index];
                       final hasVideo = lecture['video_path'] != null;
-                      final createdAt = lecture['created_at'] is Timestamp
-                          ? (lecture['created_at'] as Timestamp).toDate()
-                          : (lecture['created_at'] is String
-                                ? DateTime.tryParse(lecture['created_at']) ??
-                                      DateTime.now()
-                                : DateTime.now());
+                      // Use safe date conversion - handles Timestamp, int (epoch ms), String, DateTime
+                      final createdAt =
+                          safeDateFromDynamic(lecture['created_at']) ??
+                          DateTime.now();
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),

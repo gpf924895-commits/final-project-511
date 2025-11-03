@@ -18,7 +18,7 @@ import 'package:new_project/provider/prayer_times_provider.dart';
 import 'package:new_project/provider/sheikh_provider.dart';
 import 'package:new_project/provider/chapter_provider.dart';
 import 'package:new_project/provider/hierarchy_provider.dart';
-import 'package:new_project/database/local_sqlite_service.dart';
+import 'package:new_project/database/app_database.dart';
 import 'package:new_project/repository/local_repository.dart';
 import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 import 'dart:developer' as developer;
@@ -40,8 +40,8 @@ void main() async {
     FlutterError.dumpErrorToConsole(details);
   };
 
-  // Initialize local SQLite database
-  await _initializeLocalDatabase();
+  // Initialize AppDatabase (must complete before any queries)
+  await _initializeAppDatabase();
 
   runApp(
     MultiProvider(
@@ -60,22 +60,29 @@ void main() async {
   );
 }
 
-// Initialize local SQLite database (offline-only)
-Future<void> _initializeLocalDatabase() async {
+// Initialize AppDatabase (robust SQLite with migrations)
+Future<void> _initializeAppDatabase() async {
   try {
-    developer.log('[DB] Initializing local SQLite database...');
+    developer.log('[DB] Initializing AppDatabase...');
 
-    // Open/create database
-    final sqliteService = LocalSQLiteService();
-    final db = await sqliteService.db;
+    // Initialize AppDatabase - ensures schema exists before any queries
+    final appDatabase = AppDatabase();
+    await appDatabase.database;
 
-    // Log database path
-    final dbPath = await sqliteService.getDatabasePath();
+    // Log database path and health check
+    final dbPath = await appDatabase.getDatabasePath();
     developer.log('[DB] path: $dbPath');
-    developer.log('[DB] schema version: 2');
+
+    final isHealthy = await appDatabase.healthCheck();
+    if (!isHealthy) {
+      developer.log('[DB] ⚠️ Health check failed - some tables missing');
+    } else {
+      developer.log('[DB] ✅ Health check passed - all critical tables present');
+    }
 
     // Verify SQLite version and compile options
     try {
+      final db = await appDatabase.database;
       final versionResult = await db.rawQuery(
         'SELECT sqlite_version() as version',
       );
@@ -113,7 +120,7 @@ Future<void> _initializeLocalDatabase() async {
     // Log row counts
     final counts = await repository.getTableCounts();
     developer.log(
-      '[DB] users: ${counts['users']} | subcategories: ${counts['subcategories']} | lectures: ${counts['lectures']}',
+      '[DB] users: ${counts['users']} | subcategories: ${counts['subcategories']} | lectures: ${counts['lectures']} | sheikhs: ${counts['sheikhs'] ?? 0}',
     );
 
     developer.log('[DB] Initialization completed');
@@ -148,6 +155,17 @@ class _MyAppState extends State<MyApp> {
       // Initialize AuthProvider
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.initialize();
+
+      // Initialize all data providers to load from SQLite
+      final lectureProvider = Provider.of<LectureProvider>(
+        context,
+        listen: false,
+      );
+
+      // Load all lectures from SQLite on startup
+      await lectureProvider.loadAllSections();
+
+      developer.log('[App] Data providers initialized from SQLite');
 
       setState(() {
         _initialized = true;

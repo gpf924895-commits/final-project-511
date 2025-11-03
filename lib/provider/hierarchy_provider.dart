@@ -114,6 +114,10 @@ class HierarchyProvider extends ChangeNotifier {
       );
 
       if (result['success']) {
+        // Reload categories for the current section
+        if (_selectedSection != null) {
+          await loadCategoriesBySection(_selectedSection!);
+        }
         _setLoading(false);
         return true;
       } else {
@@ -137,6 +141,10 @@ class HierarchyProvider extends ChangeNotifier {
       final result = await _hierarchyService.deleteCategory(categoryId);
 
       if (result['success']) {
+        // Reload categories for the current section
+        if (_selectedSection != null) {
+          await loadCategoriesBySection(_selectedSection!);
+        }
         _setLoading(false);
         return true;
       } else {

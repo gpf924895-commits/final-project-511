@@ -1,19 +1,13 @@
 import 'package:new_project/offline/firestore_shims.dart';
+import 'package:new_project/utils/date_converter.dart';
 
 /// Mapper functions to convert data structures
 /// Works with both Firestore Timestamp shims and integer timestamps
 
 /// Convert timestamp (Timestamp or int) to milliseconds
+/// DEPRECATED: Use safeDateToEpochMsFromDynamic from date_converter.dart instead
 int? _timestampToMillis(dynamic timestamp) {
-  if (timestamp == null) return null;
-  if (timestamp is int) return timestamp;
-  if (timestamp is Timestamp) {
-    return timestamp.millisecondsSinceEpoch;
-  }
-  if (timestamp is DateTime) {
-    return timestamp.millisecondsSinceEpoch;
-  }
-  return null;
+  return safeDateToEpochMsFromDynamic(timestamp);
 }
 
 /// Convert Firestore user document to SQLite row

@@ -34,34 +34,56 @@ class _AddLectureFormState extends State<AddLectureForm> {
   String? _youtubeValidationError;
 
   // Hierarchy selection state
-  String? _selectedSection;
   String? _selectedCategoryId;
   String? _selectedCategoryName;
   String? _selectedSubcategoryId;
   String? _selectedSubcategoryName;
+  bool _isLoadingCats = false;
 
-  final List<Map<String, String>> _sections = [
-    {'key': 'fiqh', 'name': 'الفقه'},
-    {'key': 'hadith', 'name': 'الحديث'},
-    {'key': 'seerah', 'name': 'السيرة'},
-    {'key': 'tafsir', 'name': 'التفسير'},
-  ];
+  String? _lastSectionId;
 
   @override
   void initState() {
     super.initState();
     // Load categories for the selected section when form opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final hierarchyProvider = Provider.of<HierarchyProvider>(
-        context,
-        listen: false,
-      );
-      if (hierarchyProvider.selectedSection != null) {
-        hierarchyProvider.loadCategoriesBySection(
-          hierarchyProvider.selectedSection!,
-        );
-      }
+      _loadCategoriesForSelectedSection();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Monitor section changes and reload categories
+    final hierarchyProvider = Provider.of<HierarchyProvider>(context);
+    final currentSection = hierarchyProvider.selectedSection;
+    if (currentSection != null && currentSection != _lastSectionId) {
+      _lastSectionId = currentSection;
+      _loadCategoriesForSelectedSection();
+    }
+  }
+
+  Future<void> _loadCategoriesForSelectedSection() async {
+    final hierarchyProvider = Provider.of<HierarchyProvider>(
+      context,
+      listen: false,
+    );
+    final selectedSection = hierarchyProvider.selectedSection;
+    if (selectedSection != null) {
+      setState(() {
+        _isLoadingCats = true;
+        _selectedCategoryId = null;
+        _selectedCategoryName = null;
+        _selectedSubcategoryId = null;
+        _selectedSubcategoryName = null;
+      });
+      await hierarchyProvider.loadCategoriesBySection(selectedSection);
+      if (mounted) {
+        setState(() {
+          _isLoadingCats = false;
+        });
+      }
+    }
   }
 
   @override
@@ -308,31 +330,106 @@ class _AddLectureFormState extends State<AddLectureForm> {
                 // Category Selection
                 Consumer<HierarchyProvider>(
                   builder: (context, hierarchyProvider, child) {
+                    final categories = hierarchyProvider.categories;
+                    final isEmpty = !_isLoadingCats && categories.isEmpty;
+
+                    if (isEmpty) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.orange[50],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.orange[200]!),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: Colors.orange[700],
+                                ),
+                                const SizedBox(width: 8),
+                                const Expanded(
+                                  child: Text('لا توجد فئات - اضغط للإدارة'),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              final result = await Navigator.pushNamed(
+                                context,
+                                '/sheikh/hierarchy/manage',
+                              );
+                              if (result == true && mounted) {
+                                await _loadCategoriesForSelectedSection();
+                              }
+                            },
+                            icon: const Icon(Icons.category),
+                            label: const Text('إدارة الفئات'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+
                     return DropdownButtonFormField<String>(
                       value: _selectedCategoryId,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'الفئة *',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.folder),
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.folder),
+                        suffixIcon: _isLoadingCats
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : IconButton(
+                                icon: const Icon(Icons.refresh),
+                                tooltip: 'تحديث',
+                                onPressed: () =>
+                                    _loadCategoriesForSelectedSection(),
+                              ),
                       ),
-                      items: hierarchyProvider.categories.map((category) {
+                      items: categories.map((category) {
                         return DropdownMenuItem<String>(
                           value: category['id'] as String?,
                           child: Text(category['name'] ?? 'بدون اسم'),
                         );
                       }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedCategoryId = value;
-                          _selectedCategoryName = hierarchyProvider.categories
-                              .firstWhere((cat) => cat['id'] == value)['name'];
-                          _selectedSubcategoryId = null;
-                          _selectedSubcategoryName = null;
-                        });
-                        if (value != null) {
-                          _loadSubcategories(value);
-                        }
-                      },
+                      onChanged: _isLoadingCats
+                          ? null
+                          : (value) {
+                              setState(() {
+                                _selectedCategoryId = value;
+                                if (value != null) {
+                                  try {
+                                    _selectedCategoryName = categories
+                                        .firstWhere(
+                                          (cat) => cat['id'] == value,
+                                        )['name'];
+                                  } catch (e) {
+                                    _selectedCategoryName = null;
+                                  }
+                                } else {
+                                  _selectedCategoryName = null;
+                                }
+                                _selectedSubcategoryId = null;
+                                _selectedSubcategoryName = null;
+                              });
+                              if (value != null) {
+                                _loadSubcategories(value);
+                              }
+                            },
                     );
                   },
                 ),
@@ -805,14 +902,6 @@ class _AddLectureFormState extends State<AddLectureForm> {
     return sectionNames[section] ?? section;
   }
 
-  void _loadCategories(String section) {
-    final hierarchyProvider = Provider.of<HierarchyProvider>(
-      context,
-      listen: false,
-    );
-    hierarchyProvider.loadCategoriesBySection(section);
-  }
-
   void _loadSubcategories(String categoryId) {
     final hierarchyProvider = Provider.of<HierarchyProvider>(
       context,
@@ -964,7 +1053,7 @@ class _AddLectureFormState extends State<AddLectureForm> {
     final success = await lectureProvider.addSheikhLecture(
       sheikhId: authProvider.currentUid ?? '',
       sheikhName: authProvider.currentUser?['name'] ?? 'شيخ',
-      section: selectedSection!,
+      section: selectedSection,
       categoryId: _selectedCategoryId!,
       categoryName: _selectedCategoryName!,
       subcategoryId: _selectedSubcategoryId,
@@ -986,7 +1075,8 @@ class _AddLectureFormState extends State<AddLectureForm> {
           backgroundColor: Colors.green,
         ),
       );
-      Navigator.pop(context);
+      // Pop with refresh=true to trigger reload in parent screen
+      Navigator.pop(context, true);
     }
   }
 }

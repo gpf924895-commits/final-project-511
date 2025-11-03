@@ -52,7 +52,6 @@ class _SheikhProgramCreateScreenState extends State<SheikhProgramCreateScreen> {
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final sheikhUid = authProvider.currentUid;
-    final sheikhName = authProvider.currentUser?['name'] ?? 'شيخ';
 
     if (sheikhUid == null) {
       ScaffoldMessenger.of(

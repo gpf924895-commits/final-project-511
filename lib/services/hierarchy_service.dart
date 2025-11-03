@@ -13,7 +13,6 @@ class HierarchyService {
   // ==================== Categories Management ====================
 
   /// Add a new category
-  /// TODO: Implement categories table in LocalRepository
   Future<Map<String, dynamic>> addCategory({
     required String section,
     required String name,
@@ -21,13 +20,21 @@ class HierarchyService {
     int? order,
     required String createdBy,
   }) async {
-    // For offline-only: Categories not yet implemented
-    // Return success for now
-    return {
-      'success': true,
-      'message': 'إضافة الفئات غير مدعومة حالياً في الوضع المحلي',
-      'categoryId': '',
-    };
+    try {
+      return await _repository.addCategory(
+        sectionId: section,
+        name: name,
+        description: description,
+        order: order ?? 0,
+      );
+    } catch (e) {
+      print('Error adding category: $e');
+      return {
+        'success': false,
+        'message': 'حدث خطأ أثناء إضافة الفئة: $e',
+        'categoryId': '',
+      };
+    }
   }
 
   /// Update category
@@ -55,12 +62,15 @@ class HierarchyService {
   }
 
   /// Get categories for a section
-  /// TODO: Implement categories table in LocalRepository
   Future<List<Map<String, dynamic>>> getCategoriesBySection(
     String section,
   ) async {
-    // For offline-only: Return empty list for now
-    return [];
+    try {
+      return await _repository.getCategoriesBySection(section);
+    } catch (e) {
+      print('Error loading categories by section: $e');
+      return [];
+    }
   }
 
   /// Get real-time stream of categories for a section

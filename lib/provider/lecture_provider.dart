@@ -351,7 +351,14 @@ class LectureProvider extends ChangeNotifier {
         // Reload sheikh lectures and stats
         await loadSheikhLectures(sheikhId);
         await loadSheikhStats(sheikhId);
+        // Reload lectures by category if categoryId is available
+        if (categoryId.isNotEmpty) {
+          await loadSheikhLecturesByCategory(sheikhId, categoryId);
+        }
+        // Reload all sections to keep lists in sync
+        await loadAllSections();
         _setLoading(false);
+        notifyListeners();
         return true;
       } else {
         _setLoading(false);
@@ -412,7 +419,10 @@ class LectureProvider extends ChangeNotifier {
         // Reload sheikh lectures and stats
         await loadSheikhLectures(sheikhId);
         await loadSheikhStats(sheikhId);
+        // Reload all sections to keep lists in sync
+        await loadAllSections();
         _setLoading(false);
+        notifyListeners();
         return true;
       } else {
         _setLoading(false);
@@ -444,7 +454,10 @@ class LectureProvider extends ChangeNotifier {
         // Reload sheikh lectures and stats
         await loadSheikhLectures(sheikhId);
         await loadSheikhStats(sheikhId);
+        // Reload all sections to keep lists in sync
+        await loadAllSections();
         _setLoading(false);
+        notifyListeners();
         return true;
       } else {
         _setLoading(false);
@@ -476,7 +489,10 @@ class LectureProvider extends ChangeNotifier {
         // Reload sheikh lectures and stats
         await loadSheikhLectures(sheikhId);
         await loadSheikhStats(sheikhId);
+        // Reload all sections to keep lists in sync
+        await loadAllSections();
         _setLoading(false);
+        notifyListeners();
         return true;
       } else {
         _setLoading(false);

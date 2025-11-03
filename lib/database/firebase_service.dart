@@ -257,18 +257,13 @@ class FirebaseService {
   }) => _repo.getUserByUniqueId(uniqueId, role: role);
 
   Future<Map<String, dynamic>> deleteSheikhByUniqueId(String uniqueId) async {
-    final padded = uniqueId.trim().padLeft(8, '0');
-    final sheikh = await _repo.getUserByUniqueId(padded, role: 'sheikh');
-    if (sheikh == null)
-      return {'success': false, 'message': 'لم يتم العثور على شيخ بهذا الرقم'};
-    final name = sheikh['name'] ?? 'غير محدد';
-    final uid = sheikh['uid'] as String;
-    await _repo.archiveLecturesBySheikh(uid);
-    return {
-      'success': true,
-      'message': 'تم حذف الشيخ وجميع محاضراته بنجاح',
-      'sheikhName': name,
-    };
+    // Normalize uniqueId to exactly 8 digits (no padding, must be exactly 8)
+    final normalized = uniqueId.trim().replaceAll(RegExp(r'[^0-9]'), '');
+    if (normalized.isEmpty || normalized.length != 8) {
+      return {'success': false, 'message': 'رقم الشيخ غير صحيح'};
+    }
+    // Delegate to LocalRepository which handles soft delete and archiving
+    return await _repo.deleteSheikhByUniqueId(normalized);
   }
 
   // Live stream replacement (polling)

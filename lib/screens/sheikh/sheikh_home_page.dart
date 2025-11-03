@@ -49,25 +49,40 @@ class _SheikhHomePageState extends State<SheikhHomePage> {
 
     // If a section was selected (result == true), navigate to AddLectureForm
     if (result == true) {
-      Navigator.push(
+      final addResult = await Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const AddLectureForm()),
       );
+
+      // Reload data if lecture was added successfully
+      if (addResult == true && mounted) {
+        await _loadData();
+      }
     }
   }
 
-  void _navigateToEdit() {
-    Navigator.push(
+  void _navigateToEdit() async {
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const EditLecturePage()),
     );
+
+    // Reload data if lecture was edited successfully
+    if (result == true && mounted) {
+      await _loadData();
+    }
   }
 
-  void _navigateToDelete() {
-    Navigator.push(
+  void _navigateToDelete() async {
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const DeleteLecturePage()),
     );
+
+    // Reload data if lecture was deleted successfully
+    if (result == true && mounted) {
+      await _loadData();
+    }
   }
 
   void _navigateToHierarchyManage() {

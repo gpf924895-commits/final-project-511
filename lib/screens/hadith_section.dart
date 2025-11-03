@@ -223,33 +223,4 @@ class _HadithSectionPageState extends State<HadithSectionPage> {
       ),
     );
   }
-
-  IconData _getIconForSubcategory(String? iconName) {
-    switch (iconName) {
-      case 'mosque':
-        return Icons.mosque;
-      case 'handshake':
-        return Icons.handshake;
-      case 'family':
-        return Icons.family_restroom;
-      case 'book':
-        return Icons.menu_book;
-      case 'books':
-        return Icons.library_books;
-      case 'list':
-        return Icons.format_list_numbered;
-      case 'quran':
-        return Icons.menu_book;
-      case 'history':
-        return Icons.history_edu;
-      case 'school':
-        return Icons.school;
-      case 'location':
-        return Icons.location_on;
-      case 'flag':
-        return Icons.flag;
-      default:
-        return Icons.category;
-    }
-  }
 }

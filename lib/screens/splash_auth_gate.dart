@@ -1,15 +1,70 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:new_project/provider/pro_login.dart';
+import 'package:new_project/provider/lecture_provider.dart';
 import 'package:new_project/screens/home_page.dart';
+import 'dart:developer' as developer;
 
-class SplashAuthGate extends StatelessWidget {
+class SplashAuthGate extends StatefulWidget {
   const SplashAuthGate({super.key});
+
+  @override
+  State<SplashAuthGate> createState() => _SplashAuthGateState();
+}
+
+class _SplashAuthGateState extends State<SplashAuthGate> {
+  bool _dataLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    try {
+      // Wait for AuthProvider to be ready
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (!authProvider.isReady) {
+        // Wait a bit and retry
+        await Future.delayed(const Duration(milliseconds: 100));
+        if (mounted) {
+          _loadInitialData();
+        }
+        return;
+      }
+
+      // Load all data from SQLite on startup
+      final lectureProvider = Provider.of<LectureProvider>(
+        context,
+        listen: false,
+      );
+
+      // Load all lectures from SQLite
+      await lectureProvider.loadAllSections();
+      developer.log('[SplashAuthGate] Lectures loaded from SQLite');
+
+      // Data is loaded, proceed to show UI
+      if (mounted) {
+        setState(() {
+          _dataLoaded = true;
+        });
+      }
+    } catch (e) {
+      developer.log('[SplashAuthGate] Error loading initial data: $e');
+      // Continue anyway - don't block app startup
+      if (mounted) {
+        setState(() {
+          _dataLoaded = true;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    if (!auth.isReady) return const SplashLoading();
+    if (!auth.isReady || !_dataLoaded) return const SplashLoading();
 
     // Always show HomePage (lectures screen) as guest home
     // If user has a session, show optional "Continue as..." button

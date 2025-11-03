@@ -32,10 +32,6 @@ class _SheikhLessonFormScreenState extends State<SheikhLessonFormScreen> {
 
   File? _selectedFile;
   String? _mediaUrl;
-  String? _mediaType;
-  int? _mediaSize;
-  double? _mediaDuration;
-  String? _storagePath;
 
   bool _isUploading = false;
   bool _isLoading = false;
@@ -58,9 +54,6 @@ class _SheikhLessonFormScreenState extends State<SheikhLessonFormScreen> {
     _selectedChapterId = data['chapterId'];
     _status = data['status'] ?? 'draft';
     _mediaUrl = data['media']?['url'];
-    _mediaType = data['media']?['type'];
-    _mediaSize = data['media']?['size'];
-    _mediaDuration = data['media']?['duration']?.toDouble();
 
     if (data['dates'] != null) {
       final dates = data['dates'] as Map<String, dynamic>;
@@ -131,21 +124,12 @@ class _SheikhLessonFormScreenState extends State<SheikhLessonFormScreen> {
         throw Exception('المستخدم غير مسجل الدخول');
       }
 
-      final fileName =
-          '${DateTime.now().millisecondsSinceEpoch}.${_selectedFile?.path.split('.').last ?? 'unknown'}';
-      final storagePath = 'lessons_media/$currentUid/$fileName';
-
       // For offline mode: Use local file path
       // TODO: Implement local file storage if needed
       final downloadUrl = _selectedFile?.path; // Use local file path
 
-      final fileSize = await (_selectedFile?.length() ?? Future.value(0));
-
       setState(() {
         _mediaUrl = downloadUrl;
-        _mediaType = _selectedFile?.path.split('.').last ?? 'unknown';
-        _mediaSize = fileSize;
-        _storagePath = storagePath;
         _isUploading = false;
       });
 
@@ -184,38 +168,6 @@ class _SheikhLessonFormScreenState extends State<SheikhLessonFormScreen> {
       }
 
       final now = DateTime.now();
-      final lessonData = {
-        'title': _titleController.text.trim(),
-        'abstract': _abstractController.text.trim(),
-        'tags': _tagsController.text
-            .trim()
-            .split(',')
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .toList(),
-        'status': _status,
-        'categoryId': categoryId,
-        'sheikhUid': currentUid,
-        'createdBy': currentUid,
-        'chapterId': _selectedChapterId,
-        'updatedAt': Timestamp.fromDate(now),
-        'dates': {
-          if (_scheduledAt != null)
-            'scheduledAt': Timestamp.fromDate(_scheduledAt ?? DateTime.now()),
-          if (_recordedAt != null)
-            'recordedAt': Timestamp.fromDate(_recordedAt ?? DateTime.now()),
-          if (_publishAt != null)
-            'publishAt': Timestamp.fromDate(_publishAt ?? DateTime.now()),
-        },
-        if (_mediaUrl != null)
-          'media': {
-            'url': _mediaUrl,
-            'type': _mediaType,
-            'size': _mediaSize,
-            'duration': _mediaDuration,
-            'storagePath': _storagePath,
-          },
-      };
 
       // For offline mode: Use LocalRepository via FirebaseService
       final firebaseService = FirebaseService();
